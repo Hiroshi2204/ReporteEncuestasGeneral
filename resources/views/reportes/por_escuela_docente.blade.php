@@ -203,7 +203,7 @@
 
     <!-- ✅ PROMEDIO FINAL ABAJO -->
     <div class="resumen-final">
-        PROMEDIO FINAL DEL CURSO: {{ $promedioFinal }}
+        PROMEDIO GENERAL DEL CURSO: {{ $promedioFinal }}
     </div>
 
     <!-- ✅ Salto de página solo si NO es el último turno del último curso -->
