@@ -26,68 +26,6 @@ class ReportePDFController extends Controller
         return view('reportes.lista_escuelas', compact('escuelas'));
     }
 
-    public function reportePorEscuela1($codEscuela)
-    {
-        // 1️⃣ Obtener el nombre de la escuela
-        $escuela = DB::table('matricula')
-            ->where('COD_ESCUELA', $codEscuela)
-            ->value('NOM_ESCUELA');
-
-        if (!$escuela) {
-            abort(404, 'La escuela no existe en la base de datos.');
-        }
-
-        // 2️⃣ Obtener los datos incluyendo docente, curso y turno
-        $datos = DB::table('enc_respuestas as r')
-            ->join('matricula as m', function ($join) {
-                $join->on('r.cod_alu', '=', 'm.COD_ALUMNO')
-                    ->on('r.cod_cur', '=', 'm.COD_CURSO')
-                    ->on('r.cod_pro', '=', 'm.COD_PRO')
-                    ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'));
-            })
-            ->join('enc_pregunta as p', 'r.cod_pre', '=', 'p.cod_pre')
-            ->join('enc_area as a', 'p.cod_area', '=', 'a.cod_area')
-            ->select(
-                'm.PROFESOR as docente',
-                'm.DES_CURSO as curso',
-                'm.COD_TURNO as turno',
-                'a.nom_area',
-                'p.nom_pre as pregunta',
-                DB::raw('SUM(r.cod_alt = 1) as n1'),
-                DB::raw('SUM(r.cod_alt = 2) as n2'),
-                DB::raw('SUM(r.cod_alt = 3) as n3'),
-                DB::raw('SUM(r.cod_alt = 4) as n4'),
-                DB::raw('SUM(r.cod_alt = 5) as n5'),
-                DB::raw('COUNT(r.cod_alt) as total_respuestas'),
-                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
-            )
-            ->where('m.COD_ESCUELA', $codEscuela)
-            ->groupBy('m.PROFESOR', 'm.DES_CURSO', 'm.COD_TURNO', 'a.nom_area', 'p.nom_pre')
-            ->orderBy('m.PROFESOR')
-            ->orderBy('m.DES_CURSO')
-            ->orderBy('m.COD_TURNO')
-            ->orderBy('a.nom_area')
-            ->orderBy('p.nom_pre')
-            ->get();
-
-        // 3️⃣ Agrupar datos
-        $agrupado = $datos
-            ->groupBy('docente')
-            ->map(fn($cursos) => $cursos->groupBy('curso')
-                ->map(fn($turnos) => $turnos->groupBy('turno')));
-
-        // 4️⃣ Generar PDF
-        $pdf = Pdf::loadView('reportes.por_escuela', [
-            'escuela' => $escuela,
-            'cod_escuela' => $codEscuela,
-            'agrupado' => $agrupado
-        ]);
-
-        // 5️⃣ Descargar el PDF
-        return $pdf->download('Reporte_' . $escuela . '.pdf');
-    }
-
-
 
     public function reportePorEscuela($codEscuela)
     {
@@ -158,6 +96,92 @@ class ReportePDFController extends Controller
 
         return "✅ PDFs generados en storage/app/public/$folder";
     }
+
+    public function reportePorEscuela2($codEscuela)
+    {
+        // 1️⃣ Obtener nombre de la escuela
+        $escuela = DB::table('matricula')
+            ->where('COD_ESCUELA', $codEscuela)
+            ->value('NOM_ESCUELA');
+
+        if (!$escuela) {
+            abort(404, 'La escuela no existe en la base de datos.');
+        }
+
+        // 2️⃣ Traer datos completos
+        $datos = DB::table('enc_respuestas as r')
+            ->join('matricula as m', function ($join) {
+                $join->on('r.cod_alu', '=', 'm.COD_ALUMNO')
+                    ->on('r.cod_cur', '=', 'm.COD_CURSO')
+                    ->on('r.cod_pro', '=', 'm.COD_PRO')
+                    ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'));
+            })
+            ->join('enc_pregunta as p', 'r.cod_pre', '=', 'p.cod_pre')
+            ->join('enc_area as a', 'p.cod_area', '=', 'a.cod_area')
+            ->select(
+                'm.PROFESOR as docente',
+                'm.DES_CURSO as curso',
+                'm.COD_TURNO as turno',
+                'a.nom_area',
+                'p.nom_pre as pregunta',
+                DB::raw('SUM(r.cod_alt = 1) as n1'),
+                DB::raw('SUM(r.cod_alt = 2) as n2'),
+                DB::raw('SUM(r.cod_alt = 3) as n3'),
+                DB::raw('SUM(r.cod_alt = 4) as n4'),
+                DB::raw('SUM(r.cod_alt = 5) as n5'),
+                DB::raw('COUNT(r.cod_alt) as total_respuestas'),
+                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
+            )
+            ->where('m.COD_ESCUELA', $codEscuela)
+            ->groupBy('m.PROFESOR', 'm.DES_CURSO', 'm.COD_TURNO', 'a.nom_area', 'p.nom_pre')
+            ->orderBy('m.PROFESOR')
+            ->orderBy('m.DES_CURSO')
+            ->orderBy('m.COD_TURNO')
+            ->orderBy('a.nom_area')
+            ->orderBy('p.nom_pre')
+            ->get();
+
+        // 3️⃣ Agrupar datos por docente → curso → turno
+        $agrupado = $datos
+            ->groupBy('docente')
+            ->map(fn($cursos) => $cursos->groupBy('curso')
+                ->map(fn($turnos) => $turnos->groupBy('turno')));
+
+        // 4️⃣ Carpeta donde guardaremos PDFs (en storage/app/public)
+        $baseFolder = 'reportes/' . $codEscuela;
+        Storage::makeDirectory($baseFolder . '/mayores10Encuestados');
+        Storage::makeDirectory($baseFolder . '/menores10Encuestados');
+
+        // 5️⃣ Generar un PDF por docente
+        foreach ($agrupado as $docente => $cursos) {
+
+            // 📌 Calcular total de encuestados de TODO el docente
+            $totalEncuestadosDocente = 0;
+            foreach ($cursos as $turnos) {
+                foreach ($turnos as $preguntas) {
+                    $totalEncuestadosDocente += $preguntas->first()->total_respuestas;
+                }
+            }
+
+            // 📌 Decidir carpeta según cantidad de encuestados
+            $destino = $totalEncuestadosDocente < 10 ? 'menores10Encuestados' : 'mayores10Encuestados';
+
+            // 📄 Generar PDF
+            $pdf = Pdf::loadView('reportes.por_escuela_docente', [
+                'escuela' => $escuela,
+                'cod_escuela' => $codEscuela,
+                'docente' => $docente,
+                'cursos' => $cursos
+            ]);
+
+            // 📂 Guardar PDF en la carpeta correspondiente
+            $fileName = $baseFolder . '/' . $destino . '/Reporte_' . $docente . '.pdf';
+            Storage::put($fileName, $pdf->output());
+        }
+
+        return "✅ PDFs generados en storage/app/public/$baseFolder (carpetas mayores10 y menores10)";
+    }
+
 
 
 

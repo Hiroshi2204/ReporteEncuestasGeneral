@@ -19,11 +19,6 @@
             margin-bottom: 20px;
         }
 
-        .header img {
-            height: 70px;
-            margin-right: 15px;
-        }
-
         .header h1 {
             font-size: 20px;
             margin: 0;
@@ -39,7 +34,12 @@
         h3,
         h4 {
             color: #004080;
-            margin-top: 10px;
+            margin-top: 8px;
+            margin-bottom: 5px;
+        }
+        h6 {
+            color: #004080;
+            margin-top: 8px;
             margin-bottom: 5px;
         }
 
@@ -68,33 +68,28 @@
             background-color: #f4f8ff;
         }
 
-        .page-break {
-            page-break-after: always;
-        }
-
-        /* ✅ Tabla resumen */
-        .resumen-table {
-            width: 50%;
-            margin-top: 20px;
+        /* ✅ Tabla resumen horizontal */
+        .resumen-horizontal {
+            width: 100%;
+            margin-top: 15px;
             border-collapse: collapse;
             font-size: 12px;
         }
 
-        .resumen-table th {
-            background-color: #004080;
-            color: #fff;
-            padding: 6px;
-        }
-
-        .resumen-table td {
+        .resumen-horizontal td {
             border: 1px solid #ccc;
             padding: 6px;
             text-align: center;
+            width: auto;
         }
 
         .resumen-final {
             font-weight: bold;
             background-color: #c9daf8;
+            margin-top: 8px;
+            padding: 6px;
+            text-align: center;
+            display: inline-block;
         }
 
         .area-cell {
@@ -108,27 +103,33 @@
             font-weight: bold;
             background-color: #e6eefc;
         }
+
+        /* ❌ Quitamos saltos de página */
+        .page-break {
+            page-break-after: avoid;
+        }
     </style>
 </head>
 
 <body>
 
-    <!-- 🔵 Encabezado con logo UNAC -->
+    <!-- 🔵 Encabezado sin logo -->
     <div class="header">
-        <img src="{{ public_path('img/logo_original.png') }}" alt="UNAC">
         <div>
             <h1>UNIVERSIDAD NACIONAL DEL CALLAO</h1>
-            <h2>Reporte de Encuestas PREGRADO - {{ $escuela }}</h2>
+            <p style="font-size: 10px; margin: 0; color: #444;">
+                Escuela: <strong>{{ $escuela }}</strong>
+            </p>
         </div>
     </div>
 
     <!-- 🔵 Información principal -->
-    <h3>Docente: {{ $docente }}</h3>
+    <h6>Docente: {{ $docente }}</h6>
 
     <!-- 🔵 Tablas por curso y turno -->
     @foreach($cursos as $curso => $turnos)
     @foreach($turnos as $turno => $preguntas)
-    <h4>{{ $curso }} - Turno: {{ $turno }}</h4>
+    <h6>Curso: {{ $curso }} - Turno: {{ $turno }}</h6>
 
     @php
     // Agrupar preguntas por área
@@ -180,7 +181,6 @@
             @endphp
             @endforeach
 
-            <!-- ✅ Guardamos promedio de esta área -->
             @php
             $promediosAreas[$area] = round($sumaNotas / $rowspan, 2);
             @endphp
@@ -188,33 +188,28 @@
         </tbody>
     </table>
 
-    <!-- ✅ TABLA RESUMEN ABAJO -->
+    <!-- ✅ TABLA RESUMEN HORIZONTAL -->
     @php
     $promedioFinal = round(array_sum($promediosAreas) / count($promediosAreas), 2);
     @endphp
 
-    <table class="resumen-table">
-        <thead>
-            <tr>
-                <th>Área</th>
-                <th>Promedio</th>
-            </tr>
-        </thead>
-        <tbody>
+    <table class="resumen-horizontal">
+        <tr>
             @foreach($promediosAreas as $area => $promedio)
-            <tr>
-                <td>{{ $area }}</td>
-                <td>{{ $promedio }}</td>
-            </tr>
+            <td><strong>{{ $area }}</strong><br>{{ $promedio }}</td>
             @endforeach
-            <tr class="resumen-final">
-                <td>PROMEDIO FINAL DEL CURSO</td>
-                <td>{{ $promedioFinal }}</td>
-            </tr>
-        </tbody>
+        </tr>
     </table>
 
-    <div class="page-break"></div>
+    <!-- ✅ PROMEDIO FINAL ABAJO -->
+    <div class="resumen-final">
+        PROMEDIO FINAL DEL CURSO: {{ $promedioFinal }}
+    </div>
+
+    <!-- ✅ Salto de página solo si NO es el último turno del último curso -->
+    @if(! ($loop->last && $loop->parent->last))
+    <div style="page-break-after: always;"></div>
+    @endif
     @endforeach
     @endforeach
 
