@@ -14,19 +14,27 @@
         <table class="table table-striped table-bordered">
             <thead>
                 <tr>
+                    <th>N°</th>
                     <th>Código</th>
                     <th>Nombre de la Escuela</th>
                     <th>Acción</th>
+                    <th>Acción general</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($escuelas as $e)
                 <tr>
+                    <td>{{ $loop->iteration }}</td>
                     <td>{{ $e->COD_ESCUELA }}</td>
                     <td>{{ $e->NOM_ESCUELA }}</td>
                     <td>
                         <a href="{{ url('reportes/escuela/'.$e->COD_ESCUELA) }}" class="btn btn-primary btn-sm">
                             📄 Descargar PDF
+                        </a>
+                    </td>
+                    <td>
+                        <a href="{{ url('reportes/escuela/general/'.$e->COD_ESCUELA) }}" class="btn btn-primary btn-sm">
+                            📄 Descargar PDF General
                         </a>
                     </td>
                 </tr>

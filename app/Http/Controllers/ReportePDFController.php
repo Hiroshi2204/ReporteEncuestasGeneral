@@ -182,6 +182,101 @@ class ReportePDFController extends Controller
         return "✅ PDFs generados en storage/app/public/$baseFolder (carpetas mayores10 y menores10)";
     }
 
+    public function reporteGeneral($codEscuela)
+    {
+        // Ejecutar query con CTEs usando DB::select
+        $resultados = DB::select("
+        WITH mat_esc AS (          
+            SELECT  m.COD_ALUMNO AS cod_alu,
+                    m.COD_CURSO  AS cod_cur,
+                    m.COD_PRO    AS cod_pro,
+                    TRIM(m.COD_TURNO) AS grupo,
+                    m.NOM_ESCUELA,
+                    m.DES_CURSO  AS curso,
+                    m.PROFESOR   AS docente
+            FROM    matricula m
+            WHERE   m.COD_ESCUELA = ?
+        ),
+        resp AS (                  
+            SELECT  r.cod_alu,
+                    r.cod_cur,
+                    r.cod_pro,
+                    TRIM(r.turno) AS grupo,
+                    r.cod_alt
+            FROM    enc_respuestas r
+            JOIN    mat_esc m
+                   ON  r.cod_alu = m.cod_alu
+                  AND r.cod_cur = m.cod_cur
+                  AND r.cod_pro = m.cod_pro
+                  AND TRIM(r.turno) = m.grupo
+        ),
+        agrup AS (                 
+            SELECT  m.NOM_ESCUELA,
+                    m.docente,
+                    m.curso,
+                    m.grupo,
+                    COUNT(DISTINCT r.cod_alu)     AS encuestados,
+                    ROUND(AVG(r.cod_alt)*4,2)     AS puntaje_promedio
+            FROM    resp r
+            JOIN    mat_esc m
+                   ON r.cod_alu = m.cod_alu
+                  AND r.cod_cur = m.cod_cur
+                  AND r.cod_pro = m.cod_pro
+                  AND r.grupo   = m.grupo
+            GROUP  BY m.NOM_ESCUELA,
+                     m.docente,
+                     m.curso,
+                     m.grupo
+        )
+        SELECT  ROW_NUMBER() OVER (ORDER BY puntaje_promedio DESC) AS orden,
+                CASE 
+                  WHEN encuestados >= 10 THEN '≥10 encuestas'
+                  ELSE '<10 encuestas'
+                END AS categoria,
+                docente,
+                curso,
+                grupo          AS grupo_horario,
+                encuestados,
+                puntaje_promedio
+        FROM    agrup
+        ORDER BY puntaje_promedio DESC
+    ", [$codEscuela]);
+
+        // 📊 Dividimos los resultados en dos grupos
+        $masDiez = array_filter($resultados, fn($r) => $r->encuestados >= 10);
+        $menosDiez = array_filter($resultados, fn($r) => $r->encuestados < 10);
+
+        // ✅ Mandamos todo a la vista PDF
+        $escuela = DB::table('matricula')
+            ->where('COD_ESCUELA', $codEscuela)
+            ->value('NOM_ESCUELA');
+
+        $pdf = PDF::loadView('reportes.reporte_general', compact('escuela', 'masDiez', 'menosDiez'))
+            ->setPaper('A4', 'portrait');
+
+        //return $pdf->download("Reporte-$escuela.pdf");
+        // 📂 Carpeta de destino en storage
+        $folderPath = storage_path('app/reporte_general');
+
+        // Si no existe la carpeta, la crea
+        if (!file_exists($folderPath)) {
+            mkdir($folderPath, 0777, true);
+        }
+
+        // 📄 Nombre del archivo PDF
+        $fileName = "Orden_de_merito_{$escuela}.pdf";
+
+        // 📥 Guardamos el archivo en storage/app/reporte_general/
+        $pdf->save($folderPath . '/' . $fileName);
+
+        // 🔙 Opción 1: Devolver mensaje de éxito
+        return response()->json([
+            'message' => '✅ Reporte generado correctamente',
+            'file' => "storage/app/reporte_general/$fileName"
+        ]);
+    }
+
+
 
 
 

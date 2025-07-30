@@ -30,6 +30,9 @@ Route::get('/reportes/escuelas', [ReportePDFController::class, 'listaEscuelas'])
 // ✅ Descargar PDF por escuela
 Route::get('/reportes/escuela/{cod}', [ReportePDFController::class, 'reportePorEscuela'])->name('reportes.por_escuela');
 
+// ✅ Descargar PDF por escuela orden de merito general
+Route::get('reportes/escuela/general/{cod}', [ReportePDFController::class, 'reporteGeneral']);
+
 
 
 Route::get('/reportes/generar', [ReportePDFController::class, 'generarPorEscuelas']);
