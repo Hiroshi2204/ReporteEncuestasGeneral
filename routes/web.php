@@ -33,6 +33,12 @@ Route::get('/reportes/escuela/{cod}', [ReportePDFController::class, 'reportePorE
 // ✅ Descargar PDF por escuela orden de merito general
 Route::get('reportes/escuela/general/{cod}', [ReportePDFController::class, 'reporteGeneral']);
 
+// REPORTE DE QUIENES HICIERON LA ENCUESTA Y QUIENES NO
+Route::get('/reporte-encuestas', [ReportePDFController::class, 'index'])->name('reporte.encuestas');
+Route::get('/reporte-escuela/{nombre}', [ReportePDFController::class, 'reporteEscuela'])->name('reporte.escuela');
+Route::get('/reporte-escuela/{nombre}/pdf', [ReportePDFController::class, 'reportePDF'])->name('reporte.escuela.pdf');
+
+
 
 
 Route::get('/reportes/generar', [ReportePDFController::class, 'generarPorEscuelas']);

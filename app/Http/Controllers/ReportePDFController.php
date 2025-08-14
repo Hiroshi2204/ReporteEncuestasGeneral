@@ -38,7 +38,7 @@ class ReportePDFController extends Controller
             abort(404, 'La escuela no existe en la base de datos.');
         }
 
-        // 2️⃣ Traer datos completos
+        // 2️⃣ Traer datos completos (incluyendo COD_PRO)
         $datos = DB::table('enc_respuestas as r')
             ->join('matricula as m', function ($join) {
                 $join->on('r.cod_alu', '=', 'm.COD_ALUMNO')
@@ -49,6 +49,7 @@ class ReportePDFController extends Controller
             ->join('enc_pregunta as p', 'r.cod_pre', '=', 'p.cod_pre')
             ->join('enc_area as a', 'p.cod_area', '=', 'a.cod_area')
             ->select(
+                'm.COD_PRO',
                 'm.PROFESOR as docente',
                 'm.DES_CURSO as curso',
                 'm.COD_TURNO as turno',
@@ -63,7 +64,7 @@ class ReportePDFController extends Controller
                 DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
             )
             ->where('m.COD_ESCUELA', $codEscuela)
-            ->groupBy('m.PROFESOR', 'm.DES_CURSO', 'm.COD_TURNO', 'a.nom_area', 'p.nom_pre')
+            ->groupBy('m.COD_PRO', 'm.PROFESOR', 'm.DES_CURSO', 'm.COD_TURNO', 'a.nom_area', 'p.nom_pre')
             ->orderBy('m.PROFESOR')
             ->orderBy('m.DES_CURSO')
             ->orderBy('m.COD_TURNO')
@@ -71,31 +72,48 @@ class ReportePDFController extends Controller
             ->orderBy('p.nom_pre')
             ->get();
 
-        // 3️⃣ Agrupar datos por docente → curso → turno
+        // 3️⃣ Agrupar datos por COD_PRO
         $agrupado = $datos
-            ->groupBy('docente')
-            ->map(fn($cursos) => $cursos->groupBy('curso')
-                ->map(fn($turnos) => $turnos->groupBy('turno')));
+            ->groupBy('COD_PRO')
+            ->map(function ($itemsPorDocente) {
+                return [
+                    'docente' => $itemsPorDocente->first()->docente,
+                    'cursos' => $itemsPorDocente->groupBy('curso')
+                        ->map(fn($turnos) => $turnos->groupBy('turno'))
+                ];
+            });
 
         // 4️⃣ Carpeta donde guardaremos PDFs (en storage/app/public)
         $folder = 'reportes/' . $codEscuela;
         Storage::makeDirectory($folder);
 
-        // 5️⃣ Generar un PDF por docente
-        foreach ($agrupado as $docente => $cursos) {
+        // 5️⃣ Generar PDF por docente con su nombre en el archivo
+        foreach ($agrupado as $codPro => $info) {
+            $docente = $info['docente'];
+
+            // ✅ Limpiamos el nombre del docente para que sea seguro en el nombre del archivo
+            $docenteFile = strtoupper(str_replace(
+                [' ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ñ'],
+                ['_', 'A', 'E', 'I', 'O', 'U', 'N'],
+                $docente
+            ));
+
             $pdf = Pdf::loadView('reportes.por_escuela_docente', [
                 'escuela' => $escuela,
                 'cod_escuela' => $codEscuela,
                 'docente' => $docente,
-                'cursos' => $cursos
+                'cursos' => $info['cursos']
             ]);
 
-            $fileName = $folder . '/Reporte_' . $docente . '.pdf';
+            // ✅ Nombre del archivo: REPORTE_{NOMBRE_DOCENTE}_{CODPRO}_{COD_ESC}.pdf
+            $fileName = $folder . '/REPORTE_' . $docenteFile . '_' . $codPro . '_' . $codEscuela . '.pdf';
             Storage::put($fileName, $pdf->output());
         }
 
         return "✅ PDFs generados en storage/app/public/$folder";
     }
+
+
 
     public function reportePorEscuela2($codEscuela)
     {
@@ -182,7 +200,7 @@ class ReportePDFController extends Controller
         return "✅ PDFs generados en storage/app/public/$baseFolder (carpetas mayores10 y menores10)";
     }
 
-    public function reporteGeneral($codEscuela)
+    public function reporteGeneral1($codEscuela)
     {
         // Ejecutar query con CTEs usando DB::select
         $resultados = DB::select("
@@ -275,6 +293,91 @@ class ReportePDFController extends Controller
             'file' => "storage/app/reporte_general/$fileName"
         ]);
     }
+
+
+    public function reporteGeneral($codEscuela)
+    {
+        // Ejecutar query con CTEs usando DB::select
+        $resultados = DB::select("
+        WITH mat_esc AS (          
+            SELECT  m.COD_ALUMNO AS cod_alu,
+                    m.COD_CURSO  AS cod_cur,
+                    m.COD_PRO    AS cod_pro,
+                    TRIM(m.COD_TURNO) AS grupo,
+                    m.NOM_ESCUELA,
+                    m.DES_CURSO  AS curso,
+                    m.PROFESOR   AS docente
+            FROM    matricula m
+            WHERE   m.COD_ESCUELA = ?
+        ),
+        resp AS (                  
+            SELECT  r.cod_alu,
+                    r.cod_cur,
+                    r.cod_pro,
+                    TRIM(r.turno) AS grupo,
+                    r.cod_alt
+            FROM    enc_respuestas r
+            JOIN    mat_esc m
+                   ON  r.cod_alu = m.cod_alu
+                  AND r.cod_cur = m.cod_cur
+                  AND r.cod_pro = m.cod_pro
+                  AND TRIM(r.turno) = m.grupo
+        ),
+        agrup AS (                 
+            SELECT  m.NOM_ESCUELA,
+                    m.docente,
+                    m.curso,
+                    m.grupo,
+                    COUNT(DISTINCT r.cod_alu)     AS encuestados,
+                    ROUND(AVG(r.cod_alt)*4,2)     AS puntaje_promedio
+            FROM    resp r
+            JOIN    mat_esc m
+                   ON r.cod_alu = m.cod_alu
+                  AND r.cod_cur = m.cod_cur
+                  AND r.cod_pro = m.cod_pro
+                  AND r.grupo   = m.grupo
+            GROUP  BY m.NOM_ESCUELA,
+                     m.docente,
+                     m.curso,
+                     m.grupo
+        )
+        SELECT  ROW_NUMBER() OVER (ORDER BY puntaje_promedio DESC) AS orden,
+                docente,
+                curso,
+                grupo          AS grupo_horario,
+                encuestados,
+                puntaje_promedio
+        FROM    agrup
+        WHERE   encuestados >= 10
+        ORDER BY puntaje_promedio DESC"
+        , [$codEscuela]);
+
+        // ✅ Ya no dividimos en dos grupos porque solo hay >=10
+        $masDiez = $resultados;
+
+        // ✅ Mandamos todo a la vista PDF
+        $escuela = DB::table('matricula')
+            ->where('COD_ESCUELA', $codEscuela)
+            ->value('NOM_ESCUELA');
+
+        $pdf = PDF::loadView('reportes.reporte_general', compact('escuela', 'masDiez'))
+            ->setPaper('A4', 'portrait');
+
+        // 📂 Carpeta de destino en storage
+        $folderPath = storage_path('app/reporte_general');
+        if (!file_exists($folderPath)) {
+            mkdir($folderPath, 0777, true);
+        }
+
+        $fileName = "Orden_de_merito_{$escuela}.pdf";
+        $pdf->save($folderPath . '/' . $fileName);
+
+        return response()->json([
+            'message' => '✅ Reporte generado correctamente',
+            'file' => "storage/app/reporte_general/$fileName"
+        ]);
+    }
+
 
 
 
@@ -397,4 +500,77 @@ class ReportePDFController extends Controller
 
     //     return $agrupado;
     // }
+
+
+
+
+    public function index()
+    {
+        $escuelas = DB::table('matricula')
+            ->select('NOM_ESCUELA')
+            ->distinct()
+            ->orderBy('NOM_ESCUELA')
+            ->get();
+
+        return view('encuestas.escuelas', compact('escuelas'));
+    }
+
+    public function reporteEscuela($nombre)
+    {
+        $alumnos = DB::table('matricula')
+            ->where('NOM_ESCUELA', $nombre)
+            ->select('COD_ALUMNO', 'NOM_ALUMNO')
+            ->groupBy('COD_ALUMNO', 'NOM_ALUMNO')
+            ->get();
+
+        $encuestados = [];
+        $noEncuestados = [];
+
+        foreach ($alumnos as $alumno) {
+            $cursos = DB::table('matricula')
+                ->where('COD_ALUMNO', $alumno->COD_ALUMNO)
+                ->get();
+
+            $respondidas = $cursos->where('ENCUESTADO', 1)->count();
+
+            if ($respondidas > 0) {
+                $encuestados[] = $alumno;
+            } else {
+                $noEncuestados[] = $alumno;
+            }
+        }
+
+        return view('encuestas.reporte_por_escuela', compact('nombre', 'encuestados', 'noEncuestados'));
+    }
+
+    public function reportePDF($nombre)
+    {
+        $alumnos = DB::table('matricula')
+            ->where('NOM_ESCUELA', $nombre)
+            ->select('COD_ALUMNO', 'NOM_ALUMNO')
+            ->groupBy('COD_ALUMNO', 'NOM_ALUMNO')
+            ->get();
+
+        $encuestados = [];
+        $noEncuestados = [];
+
+        foreach ($alumnos as $alumno) {
+            $cursos = DB::table('matricula')
+                ->where('COD_ALUMNO', $alumno->COD_ALUMNO)
+                ->get();
+
+            $respondidas = $cursos->where('ENCUESTADO', 1)->count();
+
+            if ($respondidas > 0) {
+                $encuestados[] = $alumno;
+            } else {
+                $noEncuestados[] = $alumno;
+            }
+        }
+
+        $pdf = Pdf::loadView('encuestas.reporte_pdf', compact('nombre', 'encuestados', 'noEncuestados'))
+            ->setPaper('A4', 'portrait');
+
+        return $pdf->download("Reporte_{$nombre}.pdf");
+    }
 }

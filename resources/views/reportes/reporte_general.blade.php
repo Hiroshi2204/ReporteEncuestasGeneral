@@ -83,7 +83,7 @@
 
     <!-- 📊 DOCENTES CON 10 O MÁS ENCUESTADOS -->
     @if(count($masDiez) > 0)
-    <h2>Docentes con más de 10 encuestados</h2>
+    <!-- <h2>Docentes con más de 10 encuestados</h2> -->
     <table>
         <thead>
             <tr>
@@ -112,36 +112,6 @@
     <p class="no-data">⚠️ No hay docentes con más de 10 encuestados.</p>
     @endif
 
-    <!-- 📉 DOCENTES CON MENOS DE 10 ENCUESTADOS -->
-    @if(count($menosDiez) > 0)
-    <h2>Docentes con menos de 10 encuestados</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Orden</th>
-                <th>Docente</th>
-                <th>Curso</th>
-                <th>Grupo Horario</th>
-                <th>Encuestados</th>
-                <th>Promedio Final</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach ($menosDiez as $d)
-            <tr>
-                <td>{{ $loop->iteration }}</td>
-                <td>{{ $d->docente }}</td>
-                <td>{{ $d->curso }}</td>
-                <td>{{ $d->grupo_horario }}</td>
-                <td>{{ $d->encuestados }}</td>
-                <td><strong>{{ number_format($d->puntaje_promedio, 2) }}</strong></td>
-            </tr>
-            @endforeach
-        </tbody>
-    </table>
-    @else
-    <p class="no-data">⚠️ No hay docentes con menos de 10 encuestados.</p>
-    @endif
 
 </body>
 
