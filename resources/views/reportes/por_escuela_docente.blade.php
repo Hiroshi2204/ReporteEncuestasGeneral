@@ -4,126 +4,258 @@
 <head>
     <meta charset="utf-8">
     <title>Reporte - {{ $docente }}</title>
+
+    <!-- Bootstrap reducido compatible con PDF -->
     <style>
+        /* GRID MINIMAL */
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .col {
+            flex: 1;
+        }
+
+        @page {
+            size: A4;
+            margin: 140px 35px 110px 35px;
+            /* espacio optimizado */
+        }
+
         body {
             font-family: 'DejaVu Sans', sans-serif;
-            margin: 20px;
             color: #333;
         }
 
-        h1,
-        h6 {
-            color: #004080;
-            margin: 5px 0;
+        /* ==========================================
+           ENCABEZADO PROFESIONAL
+        ========================================== */
+        header {
+            position: fixed;
+            top: -120px;
+            left: 0;
+            right: 0;
+            height: 110px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+
+            border-bottom: 2px solid #003366;
         }
 
+        .logo {
+            width: 80px;
+        }
+
+        .titulo-uni {
+            font-size: 22px;
+            font-weight: bold;
+            color: #003366;
+            text-align: center;
+            line-height: 1.1;
+        }
+
+        /* ==========================================
+           FOOTER PROFESIONAL PEGADO ABAJO
+        ========================================== */
+        footer {
+            position: fixed;
+            bottom: -105px;
+            left: 0;
+            right: 0;
+            height: 90px;
+
+            border-top: 2px solid #003366;
+            text-align: center;
+            padding-top: 12px;
+            font-size: 11px;
+            color: #003366;
+        }
+
+        /* ==========================================
+            TABLAS
+        ========================================== */
         table {
             width: 100%;
             border-collapse: collapse;
             font-size: 11px;
-            margin-top: 10px;
         }
 
         th {
-            background-color: #004080;
-            color: white;
+            background: #003366;
+            color: #fff;
             padding: 5px;
-            text-align: center;
+            font-size: 10px;
         }
 
         td {
-            border: 1px solid #ccc;
+            border: 1px solid #cdd3dd;
             padding: 4px;
-            text-align: center;
         }
 
         tr:nth-child(even) {
-            background-color: #f4f8ff;
+            background: #eef4ff;
         }
 
         .area-cell {
-            text-align: left;
+            background: #d9e4f7;
             font-weight: bold;
+            text-align: left;
         }
 
         .resumen-horizontal td {
-            border: 1px solid #ccc;
+            background: #f1f5ff;
             padding: 6px;
-            text-align: center;
+            font-weight: bold;
         }
 
         .resumen-final {
-            font-weight: bold;
-            background-color: #c9daf8;
-            padding: 6px;
+            background: #c7d8f7;
+            padding: 8px;
             text-align: center;
-            margin-top: 10px;
+            font-size: 13px;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        /* ==========================================
+           AJUSTE AUTOMÁTICO PRIMERA HOJA
+        ========================================== */
+        .compact td {
+            padding: 3px !important;
+            font-size: 10px !important;
+        }
+
+        .compact th {
+            padding: 4px !important;
+            font-size: 9px !important;
+        }
+
+        /* ==========================================
+           EVITAR CORTES ENTRE CURSOS
+        ========================================== */
+        .curso-wrapper {
+            page-break-inside: avoid;
+            margin-bottom: 28px;
+        }
+
+        .page-break {
+            page-break-after: always;
         }
     </style>
 </head>
 
 <body>
-    <h2>UNIVERSIDAD NACIONAL DEL CALLAO</h2>
-    <p>Escuela: <strong>{{ $escuela }}</strong></p>
-    <h6>Docente: {{ $docente }}</h6>
 
-    @foreach($cursos as $curso => $turnos)
-    @foreach($turnos as $turno => $data)
-    <h6>Curso: {{ $curso }} - Turno: {{ $turno }}</h6>
+    <!-- ENCABEZADO -->
+    <header>
+        <img class="logo"
+            src="https://portalapi.tuni.pe/ApiDatos/api/imagen?img=027\LOGO\logos%20licenciadas_86.png">
 
-    <table>
-        <tr class="info-row">
-            <td colspan="8" style="text-align:left;">TOTAL DE ENCUESTADOS: {{ $data['totalEncuestados'] }}</td>
-        </tr>
-        <thead>
-            <tr>
-                <th>Área</th>
-                <th>Pregunta</th>
-                <th>1</th>
-                <th>2</th>
-                <th>3</th>
-                <th>4</th>
-                <th>5</th>
-                <th>Nota /20</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach($data['areas'] as $area => $infoArea)
-            @foreach($infoArea['preguntas'] as $index => $p)
-            <tr>
-                @if($index == 0)
-                <td class="area-cell" rowspan="{{ count($infoArea['preguntas']) }}">{{ $area }}</td>
-                @endif
-                <td style="text-align:left;">{{ $p->pregunta }}</td>
-                <td>{{ $p->n1 }}</td>
-                <td>{{ $p->n2 }}</td>
-                <td>{{ $p->n3 }}</td>
-                <td>{{ $p->n4 }}</td>
-                <td>{{ $p->n5 }}</td>
-                <td><strong>{{ $p->nota_item_20 }}</strong></td>
-            </tr>
-            @endforeach
-            @endforeach
-        </tbody>
-    </table>
+        <div class="titulo-uni">
+            UNIVERSIDAD NACIONAL DEL CALLAO <br>
+        </div>
+        
+    </header>
 
-    <table class="resumen-horizontal">
-        <tr>
-            @foreach($data['areas'] as $area => $infoArea)
-            <td><strong>{{ $area }}</strong><br>{{ $infoArea['promedio'] }}</td>
-            @endforeach
-        </tr>
-    </table>
+    <!-- FOOTER -->
+    <footer>
+        LEYENDA: 1 = DEFICIENTE | 2 = INSUFICIENTE | 3 = REGULAR | 4 = BUENO | 5 = EXCELENTE
+    </footer>
 
-    <div class="resumen-final">
-        PROMEDIO GENERAL DEL CURSO: {{ $data['promedioFinal'] }}
-    </div>
+    <main>
 
-    @if(! ($loop->last && $loop->parent->last))
-    <div style="page-break-after: always;"></div>
-    @endif
-    @endforeach
-    @endforeach
+        <h4 style="text-align: center;">Encuesta Estudiantil 2025-B PREGRADO</h4>
+
+        <h4 style="margin-bottom:10px;">
+            Docente: <strong>{{ $docente }}</strong> &nbsp; |  &nbsp;
+            Escuela: <strong>{{ $escuela }}</strong>
+        </h4>
+
+        @foreach($cursos as $curso => $turnos)
+        @foreach($turnos as $turno => $data)
+
+        <div class="curso-wrapper">
+
+            <h5 style="margin: 5px 0 10px 0;">
+                Curso: <strong>{{ $curso }}</strong> &nbsp; |
+                Sección: <strong>{{ $turno }}</strong>
+            </h5>
+
+            {{-- Ajuste solo para la primera hoja --}}
+            @php
+            $compact = ($loop->first && $loop->parent->first) ? 'compact' : '';
+            @endphp
+
+            <table class="{{ $compact }}">
+                <tr>
+                    <td colspan="8" style="background:#eef2fb; font-weight:bold; text-align:left;">
+                        TOTAL DE ENCUESTADOS: {{ $data['totalEncuestados'] }}
+                    </td>
+                </tr>
+
+                <thead>
+                    <tr>
+                        <th>Área</th>
+                        <th>Pregunta</th>
+                        <th>1</th>
+                        <th>2</th>
+                        <th>3</th>
+                        <th>4</th>
+                        <th>5</th>
+                        <th>Nota</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @foreach($data['areas'] as $area => $infoArea)
+                    @foreach($infoArea['preguntas'] as $i => $p)
+                    <tr>
+                        @if($i == 0)
+                        <td class="area-cell" rowspan="{{ count($infoArea['preguntas']) }}">
+                            {{ $area }}
+                        </td>
+                        @endif
+
+                        <td style="text-align:left;">{{ $p->pregunta }}</td>
+                        <td>{{ $p->n1 }}</td>
+                        <td>{{ $p->n2 }}</td>
+                        <td>{{ $p->n3 }}</td>
+                        <td>{{ $p->n4 }}</td>
+                        <td>{{ $p->n5 }}</td>
+                        <td><strong>{{ number_format($p->nota_item_20, 2) }}</strong></td>
+                    </tr>
+                    @endforeach
+                    @endforeach
+                </tbody>
+            </table>
+
+            <table class="resumen-horizontal">
+                <tr>
+                    @foreach($data['areas'] as $area => $infoArea)
+                    <td>{{ $area }}<br>{{ number_format($infoArea['promedio'], 2) }}</td>
+                    @endforeach
+                </tr>
+            </table>
+
+            <div class="resumen-final">
+                PROMEDIO GENERAL DEL CURSO: {{ number_format($data['promedioFinal'], 2) }}
+            </div>
+
+        </div>
+
+        @if(! ($loop->last && $loop->parent->last))
+        <div class="page-break"></div>
+        @endif
+
+        @endforeach
+        @endforeach
+
+    </main>
+
 </body>
 
 </html>

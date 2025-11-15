@@ -25,7 +25,7 @@ Route::get('/', function () {
 */
 
 // ✅ Mostrar listado de escuelas
-Route::get('/reportes/escuelas', [ReportePDFController::class, 'listaEscuelas'])->name('reportes.escuelas');
+Route::get('', [ReportePDFController::class, 'listaEscuelas'])->name('reportes.escuelas');
 
 // ✅ Descargar PDF por escuela
 Route::get('/reportes/escuela/{cod}', [ReportePDFController::class, 'reportePorEscuela'])->name('reportes.por_escuela');

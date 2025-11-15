@@ -25,7 +25,7 @@ class ReportePDFController extends Controller
 
         return view('reportes.lista_escuelas', compact('escuelas'));
     }
-
+    //-----------------------------------------
 
     public function reportePorEscuela1($codEscuela)
     {
@@ -105,7 +105,7 @@ class ReportePDFController extends Controller
         return "✅ PDFs generados en storage/app/public/$folder";
     }
 
-    public function reportePorEscuela($codEscuela)
+    public function reportePorEscuela2($codEscuela)
     {
         // 🔹 1. Obtener nombre de la escuela
         $escuela = DB::table('matricula')
@@ -223,254 +223,6 @@ class ReportePDFController extends Controller
         }
 
         return "✅ PDFs generados en storage/app/public/$folder";
-    }
-
-
-
-
-
-
-    public function reporteGeneral2($codEscuela)
-    {
-        $escuela = DB::table('matricula')
-            ->where('COD_ESCUELA', $codEscuela)
-            ->value('NOM_ESCUELA');
-
-        if (!$escuela) {
-            abort(404, 'La escuela no existe en la base de datos.');
-        }
-
-        $datos = DB::table('enc_respuestas as r')
-            ->join('matricula as m', function ($join) {
-                $join->on('r.cod_alu', '=', 'm.COD_ALUMNO')
-                    ->on('r.cod_cur', '=', 'm.COD_CURSO')
-                    ->on('r.cod_pro', '=', 'm.COD_PRO')
-                    ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'));
-            })
-            ->join('enc_pregunta as p', 'r.cod_pre', '=', 'p.cod_pre')
-            ->join('enc_area as a', 'p.cod_area', '=', 'a.cod_area')
-            ->select(
-                'm.COD_PRO',
-                'm.PROFESOR as docente',
-                'm.DES_CURSO as curso',
-                'm.COD_TURNO as turno',
-                'a.nom_area',
-                'p.nom_pre as pregunta',
-                DB::raw('SUM(r.cod_alt = 1) as n1'),
-                DB::raw('SUM(r.cod_alt = 2) as n2'),
-                DB::raw('SUM(r.cod_alt = 3) as n3'),
-                DB::raw('SUM(r.cod_alt = 4) as n4'),
-                DB::raw('SUM(r.cod_alt = 5) as n5'),
-                DB::raw('COUNT(r.cod_alt) as total_respuestas'),
-                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
-            )
-            ->where('m.COD_ESCUELA', $codEscuela)
-            ->groupBy('m.COD_PRO', 'm.PROFESOR', 'm.DES_CURSO', 'm.COD_TURNO', 'a.nom_area', 'p.nom_pre')
-            ->orderBy('m.PROFESOR')
-            ->orderBy('m.DES_CURSO')
-            ->orderBy('m.COD_TURNO')
-            ->orderBy('a.nom_area')
-            ->orderBy('p.nom_pre')
-            ->get();
-
-        $agrupado = $datos
-            ->groupBy('COD_PRO')
-            ->map(function ($itemsPorDocente) {
-                $docente = $itemsPorDocente->first()->docente;
-
-                $cursos = $itemsPorDocente
-                    ->groupBy('curso')
-                    ->map(function ($itemsCurso) {
-                        $turnos = $itemsCurso->groupBy('turno')->map(function ($itemsTurno) {
-                            $preguntasPorArea = $itemsTurno->groupBy('nom_area');
-                            $promediosAreas = [];
-                            $encuestados = $itemsTurno->first()->total_respuestas ?? 0;
-
-                            // ✅ Misma lógica que el reporte individual
-                            foreach ($preguntasPorArea as $area => $preguntas) {
-                                $sumaNotas = $preguntas->sum('nota_item_20');
-                                $numPreguntas = $preguntas->count();
-                                $promediosAreas[$area] = $numPreguntas > 0
-                                    ? round($sumaNotas / $numPreguntas, 2)
-                                    : 0;
-                            }
-
-                            $promedioFinal = count($promediosAreas) > 0
-                                ? round(array_sum($promediosAreas) / count($promediosAreas), 2)
-                                : 0;
-
-                            return [
-                                'turno' => $itemsTurno->first()->turno,
-                                'encuestados' => $encuestados,
-                                'promedios_areas' => $promediosAreas,
-                                'promedio_final' => $promedioFinal
-                            ];
-                        });
-
-                        return $turnos;
-                    });
-
-                return [
-                    'docente' => $docente,
-                    'cursos' => $cursos
-                ];
-            });
-
-        $masDiez = [];
-        foreach ($agrupado as $docenteInfo) {
-            foreach ($docenteInfo['cursos'] as $curso => $turnos) {
-                foreach ($turnos as $turno => $infoTurno) {
-                    if ($infoTurno['encuestados'] >= 10) {
-                        $masDiez[] = [
-                            'docente' => $docenteInfo['docente'],
-                            'curso' => $curso,
-                            'grupo_horario' => $infoTurno['turno'],
-                            'encuestados' => $infoTurno['encuestados'],
-                            'promedio_final' => $infoTurno['promedio_final']
-                        ];
-                    }
-                }
-            }
-        }
-
-        $masDiez = collect($masDiez)->sortByDesc('promedio_final')->values();
-
-        $pdf = PDF::loadView('reportes.reporte_general', [
-            'escuela' => $escuela,
-            'masDiez' => $masDiez
-        ])->setPaper('A4', 'portrait');
-
-        $folderPath = storage_path('app/reporte_general');
-        if (!file_exists($folderPath)) mkdir($folderPath, 0777, true);
-
-        $fileName = "Orden_de_merito_{$escuela}.pdf";
-        $pdf->save($folderPath . '/' . $fileName);
-
-        return response()->json([
-            'message' => '✅ Reporte generado correctamente',
-            'file' => "storage/app/reporte_general/$fileName"
-        ]);
-    }
-
-
-    public function reporteGeneral1($codEscuela)
-    {
-        $escuela = DB::table('matricula')
-            ->where('COD_ESCUELA', $codEscuela)
-            ->value('NOM_ESCUELA');
-
-        if (!$escuela) {
-            abort(404, 'La escuela no existe en la base de datos.');
-        }
-
-        // Obtener todos los datos necesarios
-        $datos = DB::table('enc_respuestas as r')
-            ->join('matricula as m', function ($join) {
-                $join->on('r.cod_alu', '=', 'm.COD_ALUMNO')
-                    ->on('r.cod_cur', '=', 'm.COD_CURSO')
-                    ->on('r.cod_pro', '=', 'm.COD_PRO')
-                    ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'));
-            })
-            ->join('enc_pregunta as p', 'r.cod_pre', '=', 'p.cod_pre')
-            ->join('enc_area as a', 'p.cod_area', '=', 'a.cod_area')
-            ->select(
-                'm.COD_PRO',
-                'm.PROFESOR as docente',
-                'm.DES_CURSO as curso',
-                'm.COD_TURNO as turno',
-                'a.nom_area',
-                'p.nom_pre as pregunta',
-                DB::raw('SUM(r.cod_alt = 1) as n1'),
-                DB::raw('SUM(r.cod_alt = 2) as n2'),
-                DB::raw('SUM(r.cod_alt = 3) as n3'),
-                DB::raw('SUM(r.cod_alt = 4) as n4'),
-                DB::raw('SUM(r.cod_alt = 5) as n5'),
-                DB::raw('COUNT(r.cod_alt) as total_respuestas'),
-                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
-            )
-            ->where('m.COD_ESCUELA', $codEscuela)
-            ->groupBy('m.COD_PRO', 'm.PROFESOR', 'm.DES_CURSO', 'm.COD_TURNO', 'a.nom_area', 'p.nom_pre')
-            ->orderBy('m.PROFESOR')
-            ->orderBy('m.DES_CURSO')
-            ->orderBy('m.COD_TURNO')
-            ->orderBy('a.nom_area')
-            ->orderBy('p.nom_pre')
-            ->get();
-
-        // Agrupar datos por docente, curso y turno
-        $agrupado = $datos
-            ->groupBy('COD_PRO')
-            ->map(function ($itemsPorDocente) {
-                $docente = $itemsPorDocente->first()->docente;
-
-                $cursos = $itemsPorDocente
-                    ->groupBy('curso')
-                    ->map(function ($itemsCurso) {
-                        $turnos = $itemsCurso->groupBy('turno')->map(function ($itemsTurno) {
-                            $preguntasPorArea = $itemsTurno->groupBy('nom_area');
-                            $promediosAreas = [];
-                            $encuestados = $itemsTurno->first()->total_respuestas ?? 0;
-
-                            foreach ($preguntasPorArea as $area => $preguntas) {
-                                $promediosAreas[$area] = round($preguntas->avg('nota_item_20'), 2);
-                            }
-
-                            $promedioFinal = count($promediosAreas) ? round(array_sum($promediosAreas) / count($promediosAreas), 2) : 0;
-
-                            return [
-                                'turno' => $itemsTurno->first()->turno,
-                                'encuestados' => $encuestados,
-                                'promedios_areas' => $promediosAreas,
-                                'promedio_final' => $promedioFinal
-                            ];
-                        });
-
-                        return $turnos;
-                    });
-
-                return [
-                    'docente' => $docente,
-                    'cursos' => $cursos
-                ];
-            });
-
-        // Preparar lista plana para Blade con condición encuestados >= 10
-        $masDiez = [];
-        foreach ($agrupado as $docenteInfo) {
-            foreach ($docenteInfo['cursos'] as $curso => $turnos) {
-                foreach ($turnos as $turno => $infoTurno) {
-                    if ($infoTurno['encuestados'] >= 10) {
-                        $masDiez[] = [
-                            'docente' => $docenteInfo['docente'],
-                            'curso' => $curso,
-                            'grupo_horario' => $infoTurno['turno'],
-                            'encuestados' => $infoTurno['encuestados'],
-                            'promedio_final' => $infoTurno['promedio_final']
-                        ];
-                    }
-                }
-            }
-        }
-
-        // Ordenar por promedio final descendente
-        $masDiez = collect($masDiez)->sortByDesc('promedio_final')->values();
-
-        // Generar PDF
-        $pdf = PDF::loadView('reportes.reporte_general', [
-            'escuela' => $escuela,
-            'masDiez' => $masDiez
-        ])->setPaper('A4', 'portrait');
-
-        $folderPath = storage_path('app/reporte_general');
-        if (!file_exists($folderPath)) mkdir($folderPath, 0777, true);
-
-        $fileName = "Orden_de_merito_{$escuela}.pdf";
-        $pdf->save($folderPath . '/' . $fileName);
-
-        return response()->json([
-            'message' => '✅ Reporte generado correctamente',
-            'file' => "storage/app/reporte_general/$fileName"
-        ]);
     }
 
     public function reporteGeneral3($codEscuela)
@@ -602,7 +354,7 @@ class ReportePDFController extends Controller
         ]);
     }
 
-    public function reporteGeneral($codEscuela)
+    public function reporteGeneral1($codEscuela)
     {
         $escuela = DB::table('matricula')
             ->where('COD_ESCUELA', $codEscuela)
@@ -708,6 +460,253 @@ class ReportePDFController extends Controller
         $ranking = collect($ranking)->sortByDesc('promedio_final')->values();
 
         // 🔹 Generar PDF con los datos procesados
+        $pdf = PDF::loadView('reportes.reporte_general', [
+            'escuela' => $escuela,
+            'ranking' => $ranking
+        ])->setPaper('A4', 'portrait');
+
+        $folderPath = storage_path('app/reporte_general');
+        if (!file_exists($folderPath)) mkdir($folderPath, 0777, true);
+
+        $fileName = "Orden_de_merito_{$escuela}.pdf";
+        $pdf->save($folderPath . '/' . $fileName);
+
+        return response()->json([
+            'message' => '✅ Reporte generado correctamente',
+            'file' => "storage/app/reporte_general/$fileName"
+        ]);
+    }
+
+    /**
+     * Calcula los promedios por área y el promedio final de un curso
+     */
+    private function calcularPromedioCurso($preguntasPorArea, $encuestados)
+    {
+        $resumenAreas = [];
+        $totalNotas = 0;
+        $totalPreguntas = 0;
+
+        foreach ($preguntasPorArea as $area => $items) {
+
+            $sumaNotas = collect($items)->sum('nota_item_20');
+            $numPreguntas = count($items);
+
+            $promedioArea = $numPreguntas > 0
+                ? round($sumaNotas / $numPreguntas, 2)
+                : 0;
+
+            $resumenAreas[$area] = [
+                'promedio' => $promedioArea,
+                'preguntas' => $items
+            ];
+
+            $totalNotas += $promedioArea * $numPreguntas;
+            $totalPreguntas += $numPreguntas;
+        }
+
+        $promedioFinal = $totalPreguntas > 0
+            ? round($totalNotas / $totalPreguntas, 2)
+            : 0;
+
+        return [
+            'areas' => $resumenAreas,
+            'totalEncuestados' => $encuestados,
+            'promedioFinal' => $promedioFinal
+        ];
+    }
+
+
+    public function reportePorEscuela($codEscuela)
+    {
+        $escuela = DB::table('matricula')
+            ->where('COD_ESCUELA', $codEscuela)
+            ->value('NOM_ESCUELA');
+
+        if (!$escuela) abort(404, 'La escuela no existe en la base de datos.');
+
+        // --- DATOS BASE ---
+        $datos = DB::table('enc_respuestas as r')
+            ->join('matricula as m', function ($join) {
+                $join->on('r.cod_alu', '=', 'm.COD_ALUMNO')
+                    ->on('r.cod_cur', '=', 'm.COD_CURSO')
+                    ->on('r.cod_pro', '=', 'm.COD_PRO')
+                    ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'));
+            })
+            ->join('enc_pregunta as p', 'r.cod_pre', '=', 'p.cod_pre')
+            ->join('enc_area as a', 'p.cod_area', '=', 'a.cod_area')
+            ->select(
+                'm.COD_PRO',
+                'm.PROFESOR as docente',
+                'm.DES_CURSO as curso',
+                'm.COD_TURNO as turno',
+                'a.nom_area',
+                'p.nom_pre as pregunta',
+                DB::raw('SUM(r.cod_alt = 1) as n1'),
+                DB::raw('SUM(r.cod_alt = 2) as n2'),
+                DB::raw('SUM(r.cod_alt = 3) as n3'),
+                DB::raw('SUM(r.cod_alt = 4) as n4'),
+                DB::raw('SUM(r.cod_alt = 5) as n5'),
+                DB::raw('COUNT(r.cod_alt) as total_respuestas'),
+                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
+            )
+            ->where('m.COD_ESCUELA', $codEscuela)
+            ->groupBy('m.COD_PRO', 'm.PROFESOR', 'm.DES_CURSO', 'm.COD_TURNO', 'a.nom_area', 'p.nom_pre')
+            ->orderBy('m.PROFESOR')
+            ->orderBy('m.DES_CURSO')
+            ->orderBy('m.COD_TURNO')
+            ->orderBy('a.nom_area')
+            ->orderBy('p.nom_pre')
+            ->get();
+
+        // --- AGRUPACIÓN ---
+        $agrupado = $datos
+            ->groupBy('COD_PRO')
+            ->map(function ($itemsPorDocente) {
+
+                $docente = $itemsPorDocente->first()->docente;
+
+                $cursos = $itemsPorDocente->groupBy('curso')->map(function ($itemsCurso) {
+
+                    return $itemsCurso->groupBy('turno')->map(function ($itemsTurno) {
+
+                        $preguntasPorArea = $itemsTurno->groupBy('nom_area');
+                        $encuestados = $itemsTurno->first()->total_respuestas ?? 0;
+
+                        return $this->calcularPromedioCurso($preguntasPorArea, $encuestados);
+                    });
+                });
+
+                return [
+                    'docente' => $docente,
+                    'cursos' => $cursos
+                ];
+            });
+
+        // --- GENERAR PDF POR DOCENTE ---
+        $folder = 'reportes/' . $codEscuela;
+        Storage::makeDirectory($folder);
+
+        foreach ($agrupado as $codPro => $info) {
+
+            $docente = $info['docente'];
+
+            $docenteFile = strtoupper(str_replace(
+                [' ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ñ'],
+                ['_', 'A', 'E', 'I', 'O', 'U', 'N'],
+                $docente
+            ));
+
+            $pdf = Pdf::loadView('reportes.por_escuela_docente', [
+                'escuela' => $escuela,
+                'cod_escuela' => $codEscuela,
+                'docente' => $docente,
+                'cursos' => $info['cursos']
+            ]);
+
+            $fileName = $folder . '/REPORTE_' . $docenteFile . '_' . $codPro . '_' . $codEscuela . '.pdf';
+            Storage::put($fileName, $pdf->output());
+        }
+
+        return "✅ PDFs generados en storage/app/public/$folder";
+    }
+
+
+    public function reporteGeneral($codEscuela)
+    {
+        $escuela = DB::table('matricula')
+            ->where('COD_ESCUELA', $codEscuela)
+            ->value('NOM_ESCUELA');
+
+        if (!$escuela) abort(404, 'La escuela no existe en la base de datos.');
+
+        // --- DATOS BASE ---
+        $datos = DB::table('enc_respuestas as r')
+            ->join('matricula as m', function ($join) {
+                $join->on('r.cod_alu', '=', 'm.COD_ALUMNO')
+                    ->on('r.cod_cur', '=', 'm.COD_CURSO')
+                    ->on('r.cod_pro', '=', 'm.COD_PRO')
+                    ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'));
+            })
+            ->join('enc_pregunta as p', 'r.cod_pre', '=', 'p.cod_pre')
+            ->join('enc_area as a', 'p.cod_area', '=', 'a.cod_area')
+            ->select(
+                'm.COD_PRO',
+                'm.PROFESOR as docente',
+                'm.DES_CURSO as curso',
+                'm.COD_TURNO as turno',
+                'a.nom_area',
+                'p.nom_pre as pregunta',
+                DB::raw('SUM(r.cod_alt = 1) as n1'),
+                DB::raw('SUM(r.cod_alt = 2) as n2'),
+                DB::raw('SUM(r.cod_alt = 3) as n3'),
+                DB::raw('SUM(r.cod_alt = 4) as n4'),
+                DB::raw('SUM(r.cod_alt = 5) as n5'),
+                DB::raw('COUNT(r.cod_alt) as total_respuestas'),
+                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
+            )
+            ->where('m.COD_ESCUELA', $codEscuela)
+            ->groupBy('m.COD_PRO', 'm.PROFESOR', 'm.DES_CURSO', 'm.COD_TURNO', 'a.nom_area', 'p.nom_pre')
+            ->orderBy('m.PROFESOR')
+            ->orderBy('m.DES_CURSO')
+            ->orderBy('m.COD_TURNO')
+            ->orderBy('a.nom_area')
+            ->orderBy('p.nom_pre')
+            ->get();
+
+        // --- AGRUPACIÓN ---
+        $agrupado = $datos->groupBy('COD_PRO')->map(function ($itemsDocente) {
+
+            $docente = $itemsDocente->first()->docente;
+
+            $cursos = $itemsDocente->groupBy('curso')->map(function ($itemsCurso) {
+
+                return $itemsCurso->groupBy('turno')->map(function ($itemsTurno) {
+
+                    $preguntasPorArea = $itemsTurno->groupBy('nom_area');
+                    $encuestados = $itemsTurno->first()->total_respuestas ?? 0;
+
+                    // --- USAR FUNCIÓN UNIFICADA ---
+                    $resultado = $this->calcularPromedioCurso($preguntasPorArea, $encuestados);
+
+                    return [
+                        'turno' => $itemsTurno->first()->turno,
+                        'encuestados' => $resultado['totalEncuestados'],
+                        'areas' => $resultado['areas'],              // ← exactamente como en reportePorEscuela
+                        'promedio_final' => $resultado['promedioFinal'], // ← EXACTAMENTE igual
+                    ];
+                });
+            });
+
+            return [
+                'docente' => $docente,
+                'cursos' => $cursos
+            ];
+        });
+
+        // --- RANKING ---
+        $ranking = [];
+
+        foreach ($agrupado as $docenteInfo) {
+            foreach ($docenteInfo['cursos'] as $curso => $turnos) {
+                foreach ($turnos as $turno => $infoTurno) {
+
+                    if ($infoTurno['encuestados'] >= 10) {
+                        $ranking[] = [
+                            'docente' => $docenteInfo['docente'],
+                            'curso' => $curso,
+                            'grupo_horario' => $infoTurno['turno'],
+                            'encuestados' => $infoTurno['encuestados'],
+                            'promedios_areas' => collect($infoTurno['areas'])->map(fn($a) => $a['promedio']),
+                            'promedio_final' => $infoTurno['promedio_final'],
+                        ];
+                    }
+                }
+            }
+        }
+
+        $ranking = collect($ranking)->sortByDesc('promedio_final')->values();
+
+        // --- PDF ---
         $pdf = PDF::loadView('reportes.reporte_general', [
             'escuela' => $escuela,
             'ranking' => $ranking
