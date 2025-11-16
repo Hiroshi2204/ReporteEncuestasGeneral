@@ -7,7 +7,8 @@
 
     <style>
         @page {
-            margin: 150px 40px 100px 40px; /* Espacio para header y footer */
+            margin: 150px 40px 100px 40px;
+            /* Espacio para header y footer */
         }
 
         body {
@@ -104,13 +105,24 @@
             background: #f1f5fb;
         }
 
+        /* Columnas personalizadas */
+        .col-docente {
+            width: 44%;
+            /* Más ancho */
+        }
+
+        .col-curso {
+            width: 31%;
+            font-size: 9px;
+            /* Más estrecho */
+        }
+
         /* RANGO DE ALERTA */
         .alert-text {
             color: #c40000;
             font-style: italic;
             font-size: 13px;
         }
-
     </style>
 </head>
 
@@ -142,20 +154,24 @@
     <table>
         <thead>
             <tr>
-                <th>Orden</th>
-                <th>Docente</th>
-                <th>Curso</th>
-                <th>Grupo</th>
-                <th>Encuestados</th>
-                <th>Promedio Final</th>
+                <th style="width: 6%;">Orden</th>
+                <th class="col-docente">Docente</th>
+                <th class="col-curso">Curso</th>
+                <th style="width: 10%;">Grupo</th>
+                <th style="width: 10%;">Encuestados</th>
+                <th style="width: 12%;">Promedio Final</th>
             </tr>
         </thead>
         <tbody>
             @foreach($ranking as $r)
             <tr>
                 <td>{{ $loop->iteration }}</td>
-                <td style="text-align:left;">{{ $r['docente'] }}</td>
-                <td style="text-align:left;">{{ $r['curso'] }}</td>
+                <td style="text-align:left;" class="col-docente">
+                    {{ $r['docente'] }}
+                </td>
+                <td style="text-align:left;" class="col-curso">
+                    {{ $r['curso'] }}
+                </td>
                 <td>{{ $r['grupo_horario'] }}</td>
                 <td>{{ $r['encuestados'] }}</td>
                 <td><strong>{{ number_format($r['promedio_final'], 2) }}</strong></td>
