@@ -7,8 +7,8 @@
 
     <style>
         @page {
-            margin: 150px 40px 100px 40px;
-            /* Espacio para header y footer */
+            margin: 135px 40px 80px 40px;
+            /* Más espacio para header y footer */
         }
 
         body {
@@ -18,106 +18,137 @@
         }
 
         /* ======================================================
-            ENCABEZADO FIJO (APARECE EN TODAS LAS PÁGINAS)
+           HEADER PROFESIONAL FIJO
         =======================================================*/
         header {
             position: fixed;
-            top: -130px;
+            top: -115px;
+            /* Ubicación exacta sobre todas las páginas */
             left: 0;
             right: 0;
             height: 110px;
-
             text-align: center;
             padding-top: 10px;
-
-            border-bottom: 3px solid #002b55;
-        }
-
-        header h1 {
-            font-size: 22px;
+            border-bottom: 3px solid #ffffffff;
             color: #002b55;
-            margin: 0;
-            font-weight: bold;
-            letter-spacing: 1px;
         }
 
-        header p {
-            margin: 3px 0;
-            font-size: 13px;
-            color: #555;
+        header h1,
+        header .linea-compacta {
+            margin: 0;
+            padding: 0;
+            line-height: 1.05;
+            /* MUCHÍSIMO más pegado */
+        }
+
+        header .linea-compacta {
+            margin-top: 1px;
+            /* Ajuste fino */
+            font-size: 14px;
+        }
+
+        /* El título siguiente queda SEPARADO */
+        header .separado {
+            margin-top: 8px;
+            /* Espacio hacia abajo */
+            font-size: 14px;
+            font-weight: bold;
         }
 
         /* ======================================================
-            PIE DE PÁGINA
+           FOOTER PROFESIONAL FIJO
         =======================================================*/
         footer {
             position: fixed;
-            bottom: -80px;
+            bottom: -55px;
+            /* Más abajo */
             left: 0;
             right: 0;
-            height: 60px;
-
+            height: 40px;
             border-top: 2px solid #002b55;
+            padding: 4px 20px 0 20px;
+            font-size: 6px;
+            /* Reducido */
+            color: #002b55;
+        }
+
+        footer .footer-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        footer td {
+            border: none;
+            padding: 0;
+            vertical-align: middle;
+            white-space: nowrap;
+            /* Para que todo quede en una sola línea */
+        }
+
+        footer .left {
+            text-align: left;
+        }
+
+        footer .center {
             text-align: center;
-            font-size: 11px;
-            color: #002b55;
-            padding-top: 8px;
+        }
+
+        footer .right {
+            text-align: right;
+        }
+
+        footer .page-number::before {
+            content: counter(page);
         }
 
         /* ======================================================
-            SECCIONES / TITULOS
-        =======================================================*/
-        h2 {
-            font-size: 16px;
-            color: #002b55;
-            margin-top: 10px;
-            margin-bottom: 8px;
-            border-left: 6px solid #002b55;
-            padding-left: 10px;
-        }
-
-        /* ======================================================
-            TABLAS
+           TABLA
         =======================================================*/
         table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 15px;
             margin-bottom: 30px;
-            font-size: 11.5px;
+            font-size: 11px;
+            table-layout: fixed;
         }
 
         th {
             background: #002b55;
-            color: white;
-            padding: 7px;
+            color: #fff;
+            padding: 6px;
             text-align: center;
-            font-size: 11px;
+            font-size: 10.5px;
+            word-wrap: break-word;
+            line-height: 12px;
         }
 
         td {
             padding: 6px;
             border: 1px solid #c9d6e4;
             text-align: center;
+            word-wrap: break-word;
         }
 
         tr:nth-child(even) td {
             background: #f1f5fb;
         }
 
-        /* Columnas personalizadas */
         .col-docente {
             width: 44%;
-            /* Más ancho */
         }
 
         .col-curso {
-            width: 31%;
+            width: 30%;
             font-size: 9px;
-            /* Más estrecho */
         }
 
-        /* RANGO DE ALERTA */
+        .col-encuestados {
+            width: 9%;
+            max-width: 38px;
+            word-wrap: break-word;
+        }
+
         .alert-text {
             color: #c40000;
             font-style: italic;
@@ -129,51 +160,59 @@
 <body>
 
     <!-- ======================================================
-        HEADER (FIJO)
+         HEADER
     =======================================================-->
     <header>
         <h1>UNIVERSIDAD NACIONAL DEL CALLAO</h1>
-        <p>Orden de Mérito de Evaluación Docente</p>
-        <p>Escuela Profesional: <strong>{{ $escuela }}</strong></p>
+
+        <!-- Bloque compacto (FACULTAD y ESCUELA) -->
+        <h2 class="linea-compacta">{{ $facultad }}</h2>
+        <h2 class="linea-compacta">
+            Escuela Profesional de <strong>{{ $escuela }}</strong>
+        </h2>
+
+        <!-- Bloque separado -->
+        <h2 class="separado">ORDEN DE MÉRITO DE ENCUESTA ESTUDIANTIL 2025-B</h2>
     </header>
 
     <!-- ======================================================
-        FOOTER (FIJO)
+         FOOTER
     =======================================================-->
     <footer>
-        Reporte generado por la OTI - Sistema de Evaluación Docente
+        <table class="footer-table">
+            <tr>
+                <td class="left">VICE RECTORADO ACADÉMICO (VRA)</td>
+                <td class="center">Página <span class="page-number"></span></td>
+                <td class="right">OFICINA DE TECNOLOGÍAS DE LA INFORMACIÓN (OTI)</td>
+            </tr>
+        </table>
     </footer>
 
     <!-- ======================================================
-        CONTENIDO
+         CONTENIDO
     =======================================================-->
-
-    <h2>Ranking de Docentes Evaluados</h2>
 
     @if(count($ranking) > 0)
     <table>
         <thead>
             <tr>
-                <th style="width: 6%;">Orden</th>
+                <th style="width: 10%;">Orden</th>
                 <th class="col-docente">Docente</th>
                 <th class="col-curso">Curso</th>
-                <th style="width: 10%;">Grupo</th>
-                <th style="width: 10%;">Encuestados</th>
-                <th style="width: 12%;">Promedio Final</th>
+                <th style="width: 10%;">Sección</th>
+                <th class="col-encuestados">Encuestados</th>
+                <th style="width: 10%;">Nota Final</th>
             </tr>
         </thead>
+
         <tbody>
             @foreach($ranking as $r)
             <tr>
                 <td>{{ $loop->iteration }}</td>
-                <td style="text-align:left;" class="col-docente">
-                    {{ $r['docente'] }}
-                </td>
-                <td style="text-align:left;" class="col-curso">
-                    {{ $r['curso'] }}
-                </td>
+                <td style="text-align:left;" class="col-docente">{{ $r['docente'] }}</td>
+                <td style="text-align:left;" class="col-curso">{{ $r['curso'] }}</td>
                 <td>{{ $r['grupo_horario'] }}</td>
-                <td>{{ $r['encuestados'] }}</td>
+                <td class="col-encuestados">{{ $r['encuestados'] }}</td>
                 <td><strong>{{ number_format($r['promedio_final'], 2) }}</strong></td>
             </tr>
             @endforeach

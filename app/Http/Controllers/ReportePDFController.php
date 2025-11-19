@@ -524,6 +524,11 @@ class ReportePDFController extends Controller
 
         if (!$escuela) abort(404, 'La escuela no existe en la base de datos.');
 
+        $facultad = DB::table('matricula')
+            ->where('COD_ESCUELA', $codEscuela)
+            ->value('FACULTAD');
+        if (!$facultad) $facultad = 'FACULTAD NO REGISTRADA';
+
         // --- DATOS BASE ---
         $datos = DB::table('enc_respuestas as r')
             ->join('matricula as m', function ($join) {
@@ -600,6 +605,7 @@ class ReportePDFController extends Controller
                 'escuela' => $escuela,
                 'cod_escuela' => $codEscuela,
                 'docente' => $docente,
+                'facultad' => $facultad,
                 'cursos' => $info['cursos']
             ]);
 
@@ -618,6 +624,12 @@ class ReportePDFController extends Controller
             ->value('NOM_ESCUELA');
 
         if (!$escuela) abort(404, 'La escuela no existe en la base de datos.');
+
+        $facultad = DB::table('matricula')
+            ->where('COD_ESCUELA', $codEscuela)
+            ->value('FACULTAD');
+        if (!$facultad) $facultad = 'FACULTAD NO REGISTRADA';
+
 
         // --- DATOS BASE ---
         $datos = DB::table('enc_respuestas as r')
@@ -709,6 +721,7 @@ class ReportePDFController extends Controller
         // --- PDF ---
         $pdf = PDF::loadView('reportes.reporte_general', [
             'escuela' => $escuela,
+            'facultad' => $facultad,
             'ranking' => $ranking
         ])->setPaper('A4', 'portrait');
 
