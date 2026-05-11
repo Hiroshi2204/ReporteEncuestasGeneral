@@ -9,7 +9,7 @@ class EncPregunta extends Model
 {
     use HasFactory;
 
-    protected $table = 'enc_pregunta';
+    protected $table = 'enc_pregunta_general';
     protected $primaryKey = 'cod_pre';
     public $timestamps = false;
 

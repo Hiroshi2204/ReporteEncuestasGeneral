@@ -44,8 +44,8 @@ class ReportePDFController extends Controller
                     ->on('r.cod_pro', '=', 'm.COD_PRO')
                     ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'));
             })
-            ->join('enc_pregunta as p', 'r.cod_pre', '=', 'p.cod_pre')
-            ->join('enc_area as a', 'p.cod_area', '=', 'a.cod_area')
+            ->join('enc_pregunta_general as p', 'r.cod_pre', '=', 'p.cod_pre')
+            ->join('enc_area_general as a', 'p.cod_area', '=', 'a.cod_area')
             ->select(
                 'm.COD_PRO',
                 'm.PROFESOR as docente',
@@ -59,8 +59,14 @@ class ReportePDFController extends Controller
                 DB::raw('SUM(r.cod_alt = 4) as n4'),
                 DB::raw('SUM(r.cod_alt = 5) as n5'),
                 DB::raw('COUNT(r.cod_alt) as total_respuestas'),
-                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
-            )
+                // DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
+                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4) / NULLIF(
+                    SUM(r.cod_alt = 1) + 
+                    SUM(r.cod_alt = 2) + 
+                    SUM(r.cod_alt = 3) + 
+                    SUM(r.cod_alt = 4), 0)
+                ) * 5, 2) as nota_item_20')
+                )
             ->where('m.COD_ESCUELA', $codEscuela)
             ->groupBy('m.COD_PRO', 'm.PROFESOR', 'm.DES_CURSO', 'm.COD_TURNO', 'a.nom_area', 'p.nom_pre')
             ->orderBy('m.PROFESOR')
@@ -124,8 +130,8 @@ class ReportePDFController extends Controller
                     ->on('r.cod_pro', '=', 'm.COD_PRO')
                     ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'));
             })
-            ->join('enc_pregunta as p', 'r.cod_pre', '=', 'p.cod_pre')
-            ->join('enc_area as a', 'p.cod_area', '=', 'a.cod_area')
+            ->join('enc_pregunta_general as p', 'r.cod_pre', '=', 'p.cod_pre')
+            ->join('enc_area_general as a', 'p.cod_area', '=', 'a.cod_area')
             ->select(
                 'm.COD_PRO',
                 'm.PROFESOR as docente',
@@ -139,8 +145,14 @@ class ReportePDFController extends Controller
                 DB::raw('SUM(r.cod_alt = 4) as n4'),
                 DB::raw('SUM(r.cod_alt = 5) as n5'),
                 DB::raw('COUNT(r.cod_alt) as total_respuestas'),
-                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
-            )
+                // DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
+                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4) / NULLIF(
+                    SUM(r.cod_alt = 1) + 
+                    SUM(r.cod_alt = 2) + 
+                    SUM(r.cod_alt = 3) + 
+                    SUM(r.cod_alt = 4), 0)
+                ) * 5, 2) as nota_item_20')
+                )
             ->where('m.COD_ESCUELA', $codEscuela)
             ->groupBy('m.COD_PRO', 'm.PROFESOR', 'm.DES_CURSO', 'm.COD_TURNO', 'a.nom_area', 'p.nom_pre')
             ->orderBy('m.PROFESOR')
@@ -242,8 +254,8 @@ class ReportePDFController extends Controller
                     ->on('r.cod_pro', '=', 'm.COD_PRO')
                     ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'));
             })
-            ->join('enc_pregunta as p', 'r.cod_pre', '=', 'p.cod_pre')
-            ->join('enc_area as a', 'p.cod_area', '=', 'a.cod_area')
+            ->join('enc_pregunta_general as p', 'r.cod_pre', '=', 'p.cod_pre')
+            ->join('enc_area_general as a', 'p.cod_area', '=', 'a.cod_area')
             ->select(
                 'm.COD_PRO',
                 'm.PROFESOR as docente',
@@ -257,8 +269,14 @@ class ReportePDFController extends Controller
                 DB::raw('SUM(r.cod_alt = 4) as n4'),
                 DB::raw('SUM(r.cod_alt = 5) as n5'),
                 DB::raw('COUNT(r.cod_alt) as total_respuestas'),
-                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
-            )
+                // DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
+                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4) / NULLIF(
+                    SUM(r.cod_alt = 1) + 
+                    SUM(r.cod_alt = 2) + 
+                    SUM(r.cod_alt = 3) + 
+                    SUM(r.cod_alt = 4), 0)
+                ) * 5, 2) as nota_item_20')
+                )
             ->where('m.COD_ESCUELA', $codEscuela)
             ->groupBy('m.COD_PRO', 'm.PROFESOR', 'm.DES_CURSO', 'm.COD_TURNO', 'a.nom_area', 'p.nom_pre')
             ->orderBy('m.PROFESOR')
@@ -372,8 +390,8 @@ class ReportePDFController extends Controller
                     ->on('r.cod_pro', '=', 'm.COD_PRO')
                     ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'));
             })
-            ->join('enc_pregunta as p', 'r.cod_pre', '=', 'p.cod_pre')
-            ->join('enc_area as a', 'p.cod_area', '=', 'a.cod_area')
+            ->join('enc_pregunta_general as p', 'r.cod_pre', '=', 'p.cod_pre')
+            ->join('enc_area_general as a', 'p.cod_area', '=', 'a.cod_area')
             ->select(
                 'm.COD_PRO',
                 'm.PROFESOR as docente',
@@ -387,8 +405,14 @@ class ReportePDFController extends Controller
                 DB::raw('SUM(r.cod_alt = 4) as n4'),
                 DB::raw('SUM(r.cod_alt = 5) as n5'),
                 DB::raw('COUNT(r.cod_alt) as total_respuestas'),
-                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
-            )
+                // DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
+                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4) / NULLIF(
+                    SUM(r.cod_alt = 1) + 
+                    SUM(r.cod_alt = 2) + 
+                    SUM(r.cod_alt = 3) + 
+                    SUM(r.cod_alt = 4), 0)
+                ) * 5, 2) as nota_item_20')
+                )
             ->where('m.COD_ESCUELA', $codEscuela)
             ->groupBy('m.COD_PRO', 'm.PROFESOR', 'm.DES_CURSO', 'm.COD_TURNO', 'a.nom_area', 'p.nom_pre')
             ->orderBy('m.PROFESOR')
@@ -537,8 +561,8 @@ class ReportePDFController extends Controller
                     ->on('r.cod_pro', '=', 'm.COD_PRO')
                     ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'));
             })
-            ->join('enc_pregunta as p', 'r.cod_pre', '=', 'p.cod_pre')
-            ->join('enc_area as a', 'p.cod_area', '=', 'a.cod_area')
+            ->join('enc_pregunta_general as p', 'r.cod_pre', '=', 'p.cod_pre')
+            ->join('enc_area_general as a', 'p.cod_area', '=', 'a.cod_area')
             ->select(
                 'm.COD_PRO',
                 'm.PROFESOR as docente',
@@ -552,8 +576,14 @@ class ReportePDFController extends Controller
                 DB::raw('SUM(r.cod_alt = 4) as n4'),
                 DB::raw('SUM(r.cod_alt = 5) as n5'),
                 DB::raw('COUNT(r.cod_alt) as total_respuestas'),
-                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
-            )
+                // DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
+                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4) / NULLIF(
+                    SUM(r.cod_alt = 1) + 
+                    SUM(r.cod_alt = 2) + 
+                    SUM(r.cod_alt = 3) + 
+                    SUM(r.cod_alt = 4), 0)
+                ) * 5, 2) as nota_item_20')
+                )
             ->where('m.COD_ESCUELA', $codEscuela)
             ->groupBy('m.COD_PRO', 'm.PROFESOR', 'm.DES_CURSO', 'm.COD_TURNO', 'a.nom_area', 'p.nom_pre')
             ->orderBy('m.PROFESOR')
@@ -639,8 +669,8 @@ class ReportePDFController extends Controller
                     ->on('r.cod_pro', '=', 'm.COD_PRO')
                     ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'));
             })
-            ->join('enc_pregunta as p', 'r.cod_pre', '=', 'p.cod_pre')
-            ->join('enc_area as a', 'p.cod_area', '=', 'a.cod_area')
+            ->join('enc_pregunta_general as p', 'r.cod_pre', '=', 'p.cod_pre')
+            ->join('enc_area_general as a', 'p.cod_area', '=', 'a.cod_area')
             ->select(
                 'm.COD_PRO',
                 'm.PROFESOR as docente',
@@ -654,8 +684,14 @@ class ReportePDFController extends Controller
                 DB::raw('SUM(r.cod_alt = 4) as n4'),
                 DB::raw('SUM(r.cod_alt = 5) as n5'),
                 DB::raw('COUNT(r.cod_alt) as total_respuestas'),
-                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
-            )
+                // DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
+                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4) / NULLIF(
+                    SUM(r.cod_alt = 1) + 
+                    SUM(r.cod_alt = 2) + 
+                    SUM(r.cod_alt = 3) + 
+                    SUM(r.cod_alt = 4), 0)
+                ) * 5, 2) as nota_item_20')
+                )
             ->where('m.COD_ESCUELA', $codEscuela)
             ->groupBy('m.COD_PRO', 'm.PROFESOR', 'm.DES_CURSO', 'm.COD_TURNO', 'a.nom_area', 'p.nom_pre')
             ->orderBy('m.PROFESOR')

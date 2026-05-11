@@ -82,8 +82,8 @@ class ReporteDocenteController extends Controller
                     ->on('r.cod_pro', '=', 'm.COD_PRO')
                     ->whereRaw('TRIM(r.turno) = TRIM(m.COD_TURNO)');
             })
-            ->join('enc_pregunta as p', 'p.cod_pre', '=', 'r.cod_pre')
-            ->join('enc_area as a', 'a.cod_area', '=', 'p.cod_area')
+            ->join('enc_pregunta_general as p', 'p.cod_pre', '=', 'r.cod_pre')
+            ->join('enc_area_general as a', 'a.cod_area', '=', 'p.cod_area')
             ->select(
                 'm.COD_ESCUELA',
                 'm.NOM_ESCUELA',

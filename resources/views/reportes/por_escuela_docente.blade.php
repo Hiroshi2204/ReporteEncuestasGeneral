@@ -5,207 +5,298 @@
     <meta charset="utf-8">
     <title>Reporte - {{ $docente }}</title>
 
-    <!-- Bootstrap reducido compatible con PDF -->
     <style>
-    /* GRID MINIMAL */
-    .row {
-        display: flex;
-        flex-wrap: wrap;
-    }
+        /* =========================
+           PÁGINA A4
+        ========================== */
+        @page {
+            size: A4;
+            margin: 90px 20px 50px 20px;
+        }
 
-    .col {
-        flex: 1;
-    }
+        * {
+            box-sizing: border-box;
+        }
 
-    @page {
-        size: A4;
-        margin: 140px 35px 110px 35px;
-    }
+        body {
+            font-family: 'DejaVu Sans', sans-serif;
+            font-size: 8.3px;
+            color: #1e293b;
+            line-height: 1.1;
+            margin: 0;
+            padding: 0;
+        }
 
-    body {
-        font-family: 'DejaVu Sans', sans-serif;
-        color: #333;
-    }
+        /* =========================
+           HEADER — fijo en margen superior
+        ========================== */
+        header {
+            position: fixed;
+            top: -88px;
+            left: 0;
+            right: 0;
+            height: 86px;
+            border-bottom: 2.5px solid #0f172a;
+            padding-bottom: 5px;
+            background: #ffffff;
+        }
 
-    /* HEADER FIJO — NO TOCADO */
-    header {
-        position: fixed;
-        top: -125px;
-        left: 0;
-        right: 0;
-        height: 200px;
-        text-align: center;
-        padding-top: 0px;
-        color: #002b55;
-    }
+        .titulo {
+            text-align: center;
+            color: #0f172a;
+        }
 
-    header h1,
-    header .linea-compacta {
-        margin: 0;
-        padding: 0;
-        line-height: 1.05;
-    }
+        .titulo h1 {
+            margin: 0 0 2px 0;
+            font-size: 15px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
 
-    header .linea-compacta {
-        margin-top: 1px;
-        font-size: 14px;
-    }
+        .titulo h2 {
+            margin: 1px 0;
+            font-size: 9.5px;
+            font-weight: bold;
+            color: #1e3a8a;
+        }
 
-    header .separado {
-        margin-top: 8px;
-        font-size: 14px;
-        font-weight: bold;
-    }
+        .titulo h3 {
+            margin: 4px 0 0 0;
+            font-size: 8.5px;
+            background-color: #1e3a8a;
+            color: #ffffff;
+            display: inline-block;
+            padding: 3px 14px;
+            border-radius: 10px;
+            letter-spacing: 0.4px;
+        }
 
-    .logo {
-        width: 80px;
-    }
+        /* =========================
+           FOOTER — fijo en margen inferior
+        ========================== */
+        footer {
+            position: fixed;
+            bottom: -46px;
+            left: 0;
+            right: 0;
+            height: 40px;
+            border-top: 1.5px solid #1e3a8a;
+            text-align: center;
+            font-size: 7px;
+            padding-top: 5px;
+            color: #475569;
+            background: #ffffff;
+        }
 
-    .titulo-uni {
-        font-size: 22px;
-        font-weight: bold;
-        color: #003366;
-        text-align: center;
-        line-height: 1.1;
-    }
+        /* =========================
+           CONTENIDO PRINCIPAL
+        ========================== */
+        main {
+            margin-top: 4px;
+            /* espacio extra al final para que el footer no tape el promedio */
+            padding-bottom: 8px;
+        }
 
-    /* FOOTER FIJO */
-    footer {
-        position: fixed;
-        bottom: -60px;
-        left: 0;
-        right: 0;
-        height: 70px;
-        border-top: 2px solid #003366;
-        text-align: center;
-        padding-top: 10px;
-        font-size: 11px;
-        color: #003366;
-    }
+        /* =========================
+           TARJETA DE DOCENTE
+        ========================== */
+        .contenedor {
+            border: 1.5px solid #bfdbfe;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            /* NO overflow:hidden — evitamos que corte el promedio */
+        }
 
-    /* TABLAS */
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 11px;
-    }
+        .docente-bar {
+            background-color: #1e3a8a;
+            color: #ffffff;
+            padding: 6px 10px;
+            font-size: 9px;
+            font-weight: bold;
+            border-radius: 4px 4px 0 0;
+            letter-spacing: 0.3px;
+        }
 
-    th {
-        background: #003366;
-        color: #fff;
-        padding: 5px;
-        font-size: 10px;
-    }
+        .info {
+            background-color: #eff6ff;
+            padding: 5px 10px;
+            border-bottom: 1px solid #bfdbfe;
+            font-size: 8px;
+        }
 
-    td {
-        border: 1px solid #cdd3dd;
-        padding: 4px;
-    }
+        .info strong {
+            color: #1e3a8a;
+        }
 
-    tr:nth-child(even) {
-        background: #eef4ff;
-    }
+        /* =========================
+           TABLA PRINCIPAL
+        ========================== */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
 
-    .area-cell {
-        background: #d9e4f7;
-        font-weight: bold;
-        text-align: left;
-    }
+        thead th {
+            background-color: #1e3a8a;
+            color: #ffffff;
+            padding: 4px 3px;
+            font-size: 7.5px;
+            border: 1px solid #93c5fd;
+            text-align: center;
+        }
 
-    .resumen-horizontal td {
-        background: #f1f5ff;
-        padding: 6px;
-        font-weight: bold;
-    }
+        tbody td {
+            border: 1px solid #dbeafe;
+            padding: 3px 4px;
+            font-size: 7.3px;
+            vertical-align: middle;
+            text-align: center;
+        }
 
-    .resumen-final {
-        background: #c7d8f7;
-        padding: 8px;
-        text-align: center;
-        font-size: 13px;
-        margin-top: 15px;
-        font-weight: bold;
-    }
+        tbody tr:nth-child(even) {
+            background-color: #f8fbff;
+        }
 
-    /* Compactar primera hoja */
-    .compact td {
-        padding: 3px !important;
-        font-size: 10px !important;
-    }
+        .area {
+            background-color: #dbeafe;
+            color: #1e3a8a;
+            font-weight: bold;
+            text-align: center;
+            font-size: 7.2px;
+        }
 
-    .compact th {
-        padding: 4px !important;
-        font-size: 9px !important;
-    }
+        .pregunta {
+            text-align: left;
+            font-size: 7px;
+            line-height: 1.1;
+        }
 
-    /* Evitar cortes */
-    .curso-wrapper {
-        page-break-inside: avoid;
-        margin-bottom: 28px;
-    }
+        .nota {
+            font-weight: bold;
+            color: #0f172a;
+            background-color: #f1f5f9;
+        }
 
-    .page-break {
-        page-break-after: always;
-    }
-</style>
+        /* =========================
+           RESUMEN POR ÁREAS
+        ========================== */
+        .resumen {
+            margin-top: 3px;
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .resumen td {
+            background-color: #dbeafe;
+            border: 1px solid #93c5fd;
+            padding: 5px 4px;
+            text-align: center;
+            font-size: 7.2px;
+            font-weight: bold;
+            color: #1e3a8a;
+            line-height: 1.4;
+        }
+
+        /* =========================
+           PROMEDIO FINAL — sin gradiente para compatibilidad PDF
+        ========================== */
+        .promedio-final {
+            margin-top: 4px;
+            background-color: #0f172a;   /* color sólido, funciona en dompdf */
+            color: #ffffff;
+            text-align: center;
+            padding: 9px 8px;
+            font-size: 11.5px;
+            font-weight: bold;
+            border-radius: 0 0 4px 4px;
+            letter-spacing: 0.4px;
+            /* borde extra para garantizar visibilidad */
+            border: 2px solid #0f172a;
+        }
+
+        .promedio-final span {
+            color: #93c5fd;
+            font-size: 13px;
+        }
+
+        /* =========================
+           EVITAR CORTES BRUSCOS
+        ========================== */
+        .contenedor {
+            page-break-inside: avoid;
+        }
+
+        thead {
+            display: table-header-group;
+        }
+
+        tr, td, th {
+            page-break-inside: avoid;
+        }
+
+        /* Numeración de páginas */
+        .page-number:before {
+            content: "Página " counter(page) " de " counter(pages);
+        }
+    </style>
 
 </head>
 
 <body>
 
-    <!-- ENCABEZADO -->
+    <!-- HEADER FIJO -->
     <header>
-        <h3>UNIVERSIDAD NACIONAL DEL CALLAO</h3>
-        <h2 class="linea-compacta">
-            <strong>{{ $facultad }}</strong>
-        </h2>
-        <h2 class="linea-compacta">
-            Escuela Profesional de <strong>{{ $escuela }}</strong>
-        </h2>
-        <!-- Bloque separado -->
-        <h2 class="separado">ENCUESTA ESTUDIANTIL 2025-B</h2>
+        <div class="titulo">
+            <h1>UNIVERSIDAD NACIONAL DEL CALLAO</h1>
+            <h2>{{ $facultad }}</h2>
+            <h2>Escuela Profesional de {{ $escuela }}</h2>
+            <h3>ENCUESTA ESTUDIANTIL 2025-B</h3>
+        </div>
     </header>
 
-    <!-- FOOTER -->
+    <!-- FOOTER FIJO -->
     <footer>
-        <strong>LEYENDA:</strong> 1 = DEFICIENTE | 2 = INSUFICIENTE | 3 = REGULAR | 4 = BUENO | 5 = EXCELENTE
+        <strong>LEYENDA:</strong>
+        &nbsp; 1 = MUY EN DESACUERDO &nbsp;|&nbsp;
+        2 = EN DESACUERDO &nbsp;|&nbsp;
+        3 = DE ACUERDO &nbsp;|&nbsp;
+        4 = MUY DE ACUERDO
+        &nbsp;&nbsp;&nbsp;&nbsp;
+        <span class="page-number"></span>
     </footer>
 
+    <!-- CONTENIDO -->
     <main>
 
         @foreach($cursos as $curso => $turnos)
         @foreach($turnos as $turno => $data)
 
-        <div class="curso-wrapper">
+        <div class="contenedor">
 
-            <h5>Docente: <strong>{{ $docente }}</strong></h5>
-            <h6 style="margin: 5px 0 10px 0;">
-                Curso: <strong>{{ $curso }}</strong> &nbsp; |
-                Sección: <strong>{{ $turno }}</strong>
-            </h6>
+            <!-- BARRA DE DOCENTE -->
+            <div class="docente-bar">
+                &#128100;: {{ $docente }}
+            </div>
 
-            {{-- Ajuste solo para la primera hoja --}}
-            @php
-            $compact = ($loop->first && $loop->parent->first) ? 'compact' : '';
-            @endphp
+            <!-- INFORMACIÓN DEL CURSO -->
+            <div class="info">
+                <strong>|</strong> {{ $curso }}
+                &nbsp;&nbsp;&nbsp;
+                <strong>N° Encuestados:</strong> {{ $data['totalEncuestados'] }}
+            </div>
 
-            <table class="{{ $compact }}">
-                <tr>
-                    <td colspan="8" style="background:#eef2fb; font-weight:bold; text-align:left;">
-                        TOTAL DE ENCUESTADOS: {{ $data['totalEncuestados'] }}
-                    </td>
-                </tr>
-
+            <!-- TABLA DE PREGUNTAS -->
+            <table>
                 <thead>
                     <tr>
-                        <th>Área</th>
-                        <th>Pregunta</th>
-                        <th>1</th>
-                        <th>2</th>
-                        <th>3</th>
-                        <th>4</th>
-                        <th>5</th>
-                        <th>Nota</th>
+                        <th width="15%">Área</th>
+                        <th width="51%">Pregunta</th>
+                        <th width="5%">1</th>
+                        <th width="5%">2</th>
+                        <th width="5%">3</th>
+                        <th width="5%">4</th>
+                        <th width="9%">Nota / 20</th>
                     </tr>
                 </thead>
 
@@ -214,41 +305,44 @@
                     @foreach($infoArea['preguntas'] as $i => $p)
                     <tr>
                         @if($i == 0)
-                        <td class="area-cell" rowspan="{{ count($infoArea['preguntas']) }}">
+                        <td class="area" rowspan="{{ count($infoArea['preguntas']) }}">
                             {{ $area }}
                         </td>
                         @endif
 
-                        <td style="text-align:left;">{{ $p->pregunta }}</td>
+                        <td class="pregunta">{{ $p->pregunta }}</td>
                         <td>{{ $p->n1 }}</td>
                         <td>{{ $p->n2 }}</td>
                         <td>{{ $p->n3 }}</td>
                         <td>{{ $p->n4 }}</td>
-                        <td>{{ $p->n5 }}</td>
-                        <td><strong>{{ number_format($p->nota_item_20, 2) }}</strong></td>
+                        <td class="nota">{{ number_format($p->nota_item_20, 2) }}</td>
                     </tr>
                     @endforeach
                     @endforeach
                 </tbody>
             </table>
 
-            <table class="resumen-horizontal">
+            <!-- RESUMEN POR ÁREAS -->
+            <table class="resumen">
                 <tr>
                     @foreach($data['areas'] as $area => $infoArea)
-                    <td>{{ $area }}<br>{{ number_format($infoArea['promedio'], 2) }}</td>
+                    <td>
+                        {{ $area }}<br><br>
+                        <span style="font-size:9px; color:#0f172a;">
+                            {{ number_format($infoArea['promedio'], 2) }}
+                        </span>
+                    </td>
                     @endforeach
                 </tr>
             </table>
 
-            <div class="resumen-final">
-                PROMEDIO GENERAL DEL CURSO: {{ number_format($data['promedioFinal'], 2) }}
+            <!-- PROMEDIO FINAL — color sólido para dompdf -->
+            <div class="promedio-final">
+                PROMEDIO GENERAL DE LA ENCUESTA:
+                <span>{{ number_format($data['promedioFinal'], 2) }}</span>
             </div>
 
         </div>
-
-        @if(! ($loop->last && $loop->parent->last))
-        <div class="page-break"></div>
-        @endif
 
         @endforeach
         @endforeach

@@ -9,7 +9,7 @@ class EncArea extends Model
 {
     use HasFactory;
 
-    protected $table = 'enc_area';
+    protected $table = 'enc_area_general';
     public $timestamps = false;
 
     protected $fillable = ['cod_area','nom_area'];
