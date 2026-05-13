@@ -24,14 +24,34 @@ Route::get('/', function () {
 });
 */
 
-// ✅ Mostrar listado de escuelas
-Route::get('/reportes', [ReportePDFController::class, 'listaEscuelas'])->name('reportes.escuelas');
+//Mostrar inicio
+Route::get('', [ReportePDFController::class, 'mostrarInicio'])->name('reportes');
 
-// ✅ Descargar PDF por escuela
-Route::get('/reportes/escuela/{cod}', [ReportePDFController::class, 'reportePorEscuela'])->name('reportes.por_escuela');
+//Mostrar listado de escuelas
+Route::get('/reportes/estudiantes', [ReportePDFController::class, 'listaEscuelas'])->name('reportes.escuelas');
+Route::get('/reportes/docentes', [ReportePDFController::class, 'listaEscuelasDocente'])->name('reportes.escuelas.docente');
+//------------------------------ESTUDIANTES------------------------------//
+//Descargar PDF por escuela
+Route::get('/reportes/estudiantes/escuela/{cod}', [ReportePDFController::class, 'reportePorEscuela'])->name('reportes.estudiantes.por_escuela');
 
-// ✅ Descargar PDF por escuela orden de merito general
-Route::get('reportes/escuela/general/{cod}', [ReportePDFController::class, 'reporteGeneral']);
+//Grafico por escuela
+Route::get('/reportes/estudiantes/escuela/grafico/{cod}', [ReportePDFController::class, 'reporteGraficoPorEscuela'])->name('reportes.estudiantes.grafico');
+
+//Grafico general
+Route::get('/reportes/estudiantes/general/grafico', [ReportePDFController::class, 'reporteGraficoGeneral'])->name('reportes.estudiantes.grafico_general');
+
+//------------------------------DOCENTES------------------------------//
+//Descargar PDF por escuela
+Route::get('/reportes/docentes/escuela/{cod}', [ReportePDFController::class, 'reportePorEscuelaDocente'])->name('reportes.docentes.por_escuela');
+
+//Grafico por escuela
+Route::get('/reportes/docentes/escuela/grafico/{cod}', [ReportePDFController::class, 'reporteGraficoPorEscuelaDocente'])->name('reportes.docentes.grafico');
+
+//Grafico general
+Route::get('/reportes/docentes/general/grafico', [ReportePDFController::class, 'reporteGraficoGeneralDocente'])->name('reportes.docentes.grafico_general');
+
+
+
 
 // REPORTE DE QUIENES HICIERON LA ENCUESTA Y QUIENES NO
 Route::get('/reporte-encuestas', [ReportePDFController::class, 'index'])->name('reporte.encuestas');

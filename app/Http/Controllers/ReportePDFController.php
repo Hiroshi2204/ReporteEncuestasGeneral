@@ -14,542 +14,49 @@ use Illuminate\Support\Facades\Storage;
 
 class ReportePDFController extends Controller
 {
-    // 📄 Lista todas las escuelas para mostrar en la vista lista_escuelas.blade
+
+    public function mostrarInicio()
+    {
+        return view('reportes.inicio');
+    }
+    // Lista todas las escuelas para mostrar en la vista
     public function listaEscuelas()
     {
         $escuelas = DB::table('matricula')
             ->select('COD_ESCUELA', 'NOM_ESCUELA')
+            ->where('COD_CURSO', '=', "1234")
             ->distinct()
             ->orderBy('COD_ESCUELA')
             ->get();
 
-        return view('reportes.lista_escuelas', compact('escuelas'));
+        return view('reportes.estudiantes.lista_escuelas', compact('escuelas'));
+    }
+
+    public function listaEscuelasDocente()
+    {
+        $escuelas = DB::table('matricula')
+            ->select('COD_ESCUELA', 'NOM_ESCUELA')
+            ->where('COD_CURSO', '=', "12345")
+            ->distinct()
+            ->orderBy('COD_ESCUELA')
+            ->get();
+
+        return view('reportes.docentes.lista_escuelas', compact('escuelas'));
     }
     //-----------------------------------------
 
-    public function reportePorEscuela1($codEscuela)
+    public function reportePorEscuelademo($codEscuela)
     {
         $escuela = DB::table('matricula')
             ->where('COD_ESCUELA', $codEscuela)
-            ->value('NOM_ESCUELA');
-
-        if (!$escuela) {
-            abort(404, 'La escuela no existe en la base de datos.');
-        }
-
-        $datos = DB::table('enc_respuestas as r')
-            ->join('matricula as m', function ($join) {
-                $join->on('r.cod_alu', '=', 'm.COD_ALUMNO')
-                    ->on('r.cod_cur', '=', 'm.COD_CURSO')
-                    ->on('r.cod_pro', '=', 'm.COD_PRO')
-                    ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'));
-            })
-            ->join('enc_pregunta_general as p', 'r.cod_pre', '=', 'p.cod_pre')
-            ->join('enc_area_general as a', 'p.cod_area', '=', 'a.cod_area')
-            ->select(
-                'm.COD_PRO',
-                'm.PROFESOR as docente',
-                'm.DES_CURSO as curso',
-                'm.COD_TURNO as turno',
-                'a.nom_area',
-                'p.nom_pre as pregunta',
-                DB::raw('SUM(r.cod_alt = 1) as n1'),
-                DB::raw('SUM(r.cod_alt = 2) as n2'),
-                DB::raw('SUM(r.cod_alt = 3) as n3'),
-                DB::raw('SUM(r.cod_alt = 4) as n4'),
-                DB::raw('SUM(r.cod_alt = 5) as n5'),
-                DB::raw('COUNT(r.cod_alt) as total_respuestas'),
-                // DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
-                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4) / NULLIF(
-                    SUM(r.cod_alt = 1) + 
-                    SUM(r.cod_alt = 2) + 
-                    SUM(r.cod_alt = 3) + 
-                    SUM(r.cod_alt = 4), 0)
-                ) * 5, 2) as nota_item_20')
-                )
-            ->where('m.COD_ESCUELA', $codEscuela)
-            ->groupBy('m.COD_PRO', 'm.PROFESOR', 'm.DES_CURSO', 'm.COD_TURNO', 'a.nom_area', 'p.nom_pre')
-            ->orderBy('m.PROFESOR')
-            ->orderBy('m.DES_CURSO')
-            ->orderBy('m.COD_TURNO')
-            ->orderBy('a.nom_area')
-            ->orderBy('p.nom_pre')
-            ->get();
-
-        $agrupado = $datos
-            ->groupBy('COD_PRO')
-            ->map(function ($itemsPorDocente) {
-                return [
-                    'docente' => $itemsPorDocente->first()->docente,
-                    'cursos' => $itemsPorDocente->groupBy('curso')
-                        ->map(fn($turnos) => $turnos->groupBy('turno'))
-                ];
-            });
-
-        $folder = 'reportes/' . $codEscuela;
-        Storage::makeDirectory($folder);
-
-        foreach ($agrupado as $codPro => $info) {
-            $docente = $info['docente'];
-
-            $docenteFile = strtoupper(str_replace(
-                [' ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ñ'],
-                ['_', 'A', 'E', 'I', 'O', 'U', 'N'],
-                $docente
-            ));
-
-            $pdf = Pdf::loadView('reportes.por_escuela_docente', [
-                'escuela' => $escuela,
-                'cod_escuela' => $codEscuela,
-                'docente' => $docente,
-                'cursos' => $info['cursos']
-            ]);
-            $fileName = $folder . '/REPORTE_' . $docenteFile . '_' . $codPro . '_' . $codEscuela . '.pdf';
-            Storage::put($fileName, $pdf->output());
-        }
-
-        return "✅ PDFs generados en storage/app/public/$folder";
-    }
-
-    public function reportePorEscuela2($codEscuela)
-    {
-        // 🔹 1. Obtener nombre de la escuela
-        $escuela = DB::table('matricula')
-            ->where('COD_ESCUELA', $codEscuela)
-            ->value('NOM_ESCUELA');
-
-        if (!$escuela) {
-            abort(404, 'La escuela no existe en la base de datos.');
-        }
-
-        // 🔹 2. Consultar datos base
-        $datos = DB::table('enc_respuestas as r')
-            ->join('matricula as m', function ($join) {
-                $join->on('r.cod_alu', '=', 'm.COD_ALUMNO')
-                    ->on('r.cod_cur', '=', 'm.COD_CURSO')
-                    ->on('r.cod_pro', '=', 'm.COD_PRO')
-                    ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'));
-            })
-            ->join('enc_pregunta_general as p', 'r.cod_pre', '=', 'p.cod_pre')
-            ->join('enc_area_general as a', 'p.cod_area', '=', 'a.cod_area')
-            ->select(
-                'm.COD_PRO',
-                'm.PROFESOR as docente',
-                'm.DES_CURSO as curso',
-                'm.COD_TURNO as turno',
-                'a.nom_area',
-                'p.nom_pre as pregunta',
-                DB::raw('SUM(r.cod_alt = 1) as n1'),
-                DB::raw('SUM(r.cod_alt = 2) as n2'),
-                DB::raw('SUM(r.cod_alt = 3) as n3'),
-                DB::raw('SUM(r.cod_alt = 4) as n4'),
-                DB::raw('SUM(r.cod_alt = 5) as n5'),
-                DB::raw('COUNT(r.cod_alt) as total_respuestas'),
-                // DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
-                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4) / NULLIF(
-                    SUM(r.cod_alt = 1) + 
-                    SUM(r.cod_alt = 2) + 
-                    SUM(r.cod_alt = 3) + 
-                    SUM(r.cod_alt = 4), 0)
-                ) * 5, 2) as nota_item_20')
-                )
-            ->where('m.COD_ESCUELA', $codEscuela)
-            ->groupBy('m.COD_PRO', 'm.PROFESOR', 'm.DES_CURSO', 'm.COD_TURNO', 'a.nom_area', 'p.nom_pre')
-            ->orderBy('m.PROFESOR')
-            ->orderBy('m.DES_CURSO')
-            ->orderBy('m.COD_TURNO')
-            ->orderBy('a.nom_area')
-            ->orderBy('p.nom_pre')
-            ->get();
-
-        // 🔹 3. Agrupar datos por docente, curso y turno
-        $agrupado = $datos
-            ->groupBy('COD_PRO')
-            ->map(function ($itemsPorDocente) {
-                $docente = $itemsPorDocente->first()->docente;
-
-                // Agrupar por curso y turno
-                $cursos = $itemsPorDocente->groupBy('curso')->map(function ($turnos) {
-                    return $turnos->groupBy('turno')->map(function ($preguntas) {
-                        // Agrupar por área
-                        $preguntasPorArea = $preguntas->groupBy('nom_area');
-
-                        $resumenAreas = [];
-                        $totalNotas = 0;
-                        $totalPreguntas = 0;
-                        $totalEncuestados = $preguntas->first()->total_respuestas ?? 0;
-
-                        foreach ($preguntasPorArea as $area => $items) {
-                            $sumaNotas = collect($items)->sum('nota_item_20');
-                            $promedioArea = round($sumaNotas / max(count($items), 1), 2);
-                            $resumenAreas[$area] = [
-                                'promedio' => $promedioArea,
-                                'preguntas' => $items
-                            ];
-
-                            $totalNotas += $promedioArea * count($items);
-                            $totalPreguntas += count($items);
-                        }
-
-                        // Promedio final del curso (a partir de las áreas)
-                        $promedioFinal = $totalPreguntas > 0
-                            ? round($totalNotas / $totalPreguntas, 2)
-                            : 0;
-
-                        return [
-                            'areas' => $resumenAreas,
-                            'totalEncuestados' => $totalEncuestados,
-                            'promedioFinal' => $promedioFinal
-                        ];
-                    });
-                });
-
-                return [
-                    'docente' => $docente,
-                    'cursos' => $cursos
-                ];
-            });
-
-        // 🔹 4. Generar PDFs individuales
-        $folder = 'reportes/' . $codEscuela;
-        Storage::makeDirectory($folder);
-
-        foreach ($agrupado as $codPro => $info) {
-            $docente = $info['docente'];
-
-            $docenteFile = strtoupper(str_replace(
-                [' ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ñ'],
-                ['_', 'A', 'E', 'I', 'O', 'U', 'N'],
-                $docente
-            ));
-
-            $pdf = Pdf::loadView('reportes.por_escuela_docente', [
-                'escuela' => $escuela,
-                'cod_escuela' => $codEscuela,
-                'docente' => $docente,
-                'cursos' => $info['cursos']
-            ]);
-
-            $fileName = $folder . '/REPORTE_' . $docenteFile . '_' . $codPro . '_' . $codEscuela . '.pdf';
-            Storage::put($fileName, $pdf->output());
-        }
-
-        return "✅ PDFs generados en storage/app/public/$folder";
-    }
-
-    public function reporteGeneral3($codEscuela)
-    {
-        $escuela = DB::table('matricula')
-            ->where('COD_ESCUELA', $codEscuela)
-            ->value('NOM_ESCUELA');
-
-        if (!$escuela) {
-            abort(404, 'La escuela no existe en la base de datos.');
-        }
-
-        $datos = DB::table('enc_respuestas as r')
-            ->join('matricula as m', function ($join) {
-                $join->on('r.cod_alu', '=', 'm.COD_ALUMNO')
-                    ->on('r.cod_cur', '=', 'm.COD_CURSO')
-                    ->on('r.cod_pro', '=', 'm.COD_PRO')
-                    ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'));
-            })
-            ->join('enc_pregunta_general as p', 'r.cod_pre', '=', 'p.cod_pre')
-            ->join('enc_area_general as a', 'p.cod_area', '=', 'a.cod_area')
-            ->select(
-                'm.COD_PRO',
-                'm.PROFESOR as docente',
-                'm.DES_CURSO as curso',
-                'm.COD_TURNO as turno',
-                'a.nom_area',
-                'p.nom_pre as pregunta',
-                DB::raw('SUM(r.cod_alt = 1) as n1'),
-                DB::raw('SUM(r.cod_alt = 2) as n2'),
-                DB::raw('SUM(r.cod_alt = 3) as n3'),
-                DB::raw('SUM(r.cod_alt = 4) as n4'),
-                DB::raw('SUM(r.cod_alt = 5) as n5'),
-                DB::raw('COUNT(r.cod_alt) as total_respuestas'),
-                // DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
-                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4) / NULLIF(
-                    SUM(r.cod_alt = 1) + 
-                    SUM(r.cod_alt = 2) + 
-                    SUM(r.cod_alt = 3) + 
-                    SUM(r.cod_alt = 4), 0)
-                ) * 5, 2) as nota_item_20')
-                )
-            ->where('m.COD_ESCUELA', $codEscuela)
-            ->groupBy('m.COD_PRO', 'm.PROFESOR', 'm.DES_CURSO', 'm.COD_TURNO', 'a.nom_area', 'p.nom_pre')
-            ->orderBy('m.PROFESOR')
-            ->orderBy('m.DES_CURSO')
-            ->orderBy('m.COD_TURNO')
-            ->orderBy('a.nom_area')
-            ->orderBy('p.nom_pre')
-            ->get();
-
-        // 🔹 Agrupar por docente, curso y turno
-        $agrupado = $datos
-            ->groupBy('COD_PRO')
-            ->map(function ($itemsPorDocente) {
-                $docente = $itemsPorDocente->first()->docente;
-
-                $cursos = $itemsPorDocente
-                    ->groupBy('curso')
-                    ->map(function ($itemsCurso) {
-                        $turnos = $itemsCurso->groupBy('turno')->map(function ($itemsTurno) {
-                            $preguntasPorArea = $itemsTurno->groupBy('nom_area');
-                            $promediosAreas = [];
-                            $totalPreguntas = 0;
-                            $totalNotas = 0;
-                            $encuestados = $itemsTurno->first()->total_respuestas ?? 0;
-
-                            // ✅ Misma lógica que el reporte individual
-                            foreach ($preguntasPorArea as $area => $preguntas) {
-                                $sumaNotas = $preguntas->sum('nota_item_20');
-                                $numPreguntas = $preguntas->count();
-                                $promedioArea = $numPreguntas > 0 ? round($sumaNotas / $numPreguntas, 2) : 0;
-                                $promediosAreas[$area] = $promedioArea;
-
-                                // Ponderar correctamente
-                                $totalPreguntas += $numPreguntas;
-                                $totalNotas += $promedioArea * $numPreguntas;
-                            }
-
-                            // ✅ Promedio final ponderado (idéntico al reporte individual)
-                            $promedioFinal = $totalPreguntas > 0 ? round($totalNotas / $totalPreguntas, 2) : 0;
-
-                            return [
-                                'turno' => $itemsTurno->first()->turno,
-                                'encuestados' => $encuestados,
-                                'promedios_areas' => $promediosAreas,
-                                'promedio_final' => $promedioFinal
-                            ];
-                        });
-
-                        return $turnos;
-                    });
-
-                return [
-                    'docente' => $docente,
-                    'cursos' => $cursos
-                ];
-            });
-
-        // 🔹 Filtrar los que tienen 10 o más encuestados
-        $masDiez = [];
-        foreach ($agrupado as $docenteInfo) {
-            foreach ($docenteInfo['cursos'] as $curso => $turnos) {
-                foreach ($turnos as $turno => $infoTurno) {
-                    if ($infoTurno['encuestados'] >= 10) {
-                        $masDiez[] = [
-                            'docente' => $docenteInfo['docente'],
-                            'curso' => $curso,
-                            'grupo_horario' => $infoTurno['turno'],
-                            'encuestados' => $infoTurno['encuestados'],
-                            'promedio_final' => $infoTurno['promedio_final']
-                        ];
-                    }
-                }
-            }
-        }
-
-        $masDiez = collect($masDiez)->sortByDesc('promedio_final')->values();
-
-        // 🔹 Generar PDF
-        $pdf = PDF::loadView('reportes.reporte_general', [
-            'escuela' => $escuela,
-            'masDiez' => $masDiez
-        ])->setPaper('A4', 'portrait');
-
-        $folderPath = storage_path('app/reporte_general');
-        if (!file_exists($folderPath)) mkdir($folderPath, 0777, true);
-
-        $fileName = "Orden_de_merito_{$escuela}.pdf";
-        $pdf->save($folderPath . '/' . $fileName);
-
-        return response()->json([
-            'message' => '✅ Reporte generado correctamente',
-            'file' => "storage/app/reporte_general/$fileName"
-        ]);
-    }
-
-    public function reporteGeneral1($codEscuela)
-    {
-        $escuela = DB::table('matricula')
-            ->where('COD_ESCUELA', $codEscuela)
-            ->value('NOM_ESCUELA');
-
-        if (!$escuela) {
-            abort(404, 'La escuela no existe en la base de datos.');
-        }
-
-        // 🔹 Traemos todas las respuestas agrupadas por curso, área y pregunta
-        $datos = DB::table('enc_respuestas as r')
-            ->join('matricula as m', function ($join) {
-                $join->on('r.cod_alu', '=', 'm.COD_ALUMNO')
-                    ->on('r.cod_cur', '=', 'm.COD_CURSO')
-                    ->on('r.cod_pro', '=', 'm.COD_PRO')
-                    ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'));
-            })
-            ->join('enc_pregunta_general as p', 'r.cod_pre', '=', 'p.cod_pre')
-            ->join('enc_area_general as a', 'p.cod_area', '=', 'a.cod_area')
-            ->select(
-                'm.COD_PRO',
-                'm.PROFESOR as docente',
-                'm.DES_CURSO as curso',
-                'm.COD_TURNO as turno',
-                'a.nom_area',
-                'p.nom_pre as pregunta',
-                DB::raw('SUM(r.cod_alt = 1) as n1'),
-                DB::raw('SUM(r.cod_alt = 2) as n2'),
-                DB::raw('SUM(r.cod_alt = 3) as n3'),
-                DB::raw('SUM(r.cod_alt = 4) as n4'),
-                DB::raw('SUM(r.cod_alt = 5) as n5'),
-                DB::raw('COUNT(r.cod_alt) as total_respuestas'),
-                // DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
-                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4) / NULLIF(
-                    SUM(r.cod_alt = 1) + 
-                    SUM(r.cod_alt = 2) + 
-                    SUM(r.cod_alt = 3) + 
-                    SUM(r.cod_alt = 4), 0)
-                ) * 5, 2) as nota_item_20')
-                )
-            ->where('m.COD_ESCUELA', $codEscuela)
-            ->groupBy('m.COD_PRO', 'm.PROFESOR', 'm.DES_CURSO', 'm.COD_TURNO', 'a.nom_area', 'p.nom_pre')
-            ->orderBy('m.PROFESOR')
-            ->orderBy('m.DES_CURSO')
-            ->orderBy('m.COD_TURNO')
-            ->orderBy('a.nom_area')
-            ->orderBy('p.nom_pre')
-            ->get();
-
-        // 🔹 Agrupamos por docente, curso y turno
-        $agrupado = $datos->groupBy('COD_PRO')->map(function ($itemsPorDocente) {
-            $docente = $itemsPorDocente->first()->docente;
-
-            $cursos = $itemsPorDocente->groupBy('curso')->map(function ($itemsCurso) {
-                return $itemsCurso->groupBy('turno')->map(function ($itemsTurno) {
-                    $preguntasPorArea = $itemsTurno->groupBy('nom_area');
-                    $promediosAreas = [];
-                    $totalPreguntas = 0;
-                    $totalNotas = 0;
-                    $encuestados = $itemsTurno->first()->total_respuestas ?? 0;
-
-                    // ✅ Mismo cálculo que en el reporte individual
-                    foreach ($preguntasPorArea as $area => $preguntas) {
-                        $sumaNotas = $preguntas->sum('nota_item_20');
-                        $numPreguntas = $preguntas->count();
-                        $promedioArea = $numPreguntas > 0 ? round($sumaNotas / $numPreguntas, 2) : 0;
-                        $promediosAreas[$area] = $promedioArea;
-
-                        $totalPreguntas += $numPreguntas;
-                        $totalNotas += $promedioArea * $numPreguntas;
-                    }
-
-                    $promedioFinal = $totalPreguntas > 0 ? round($totalNotas / $totalPreguntas, 2) : 0;
-
-                    return [
-                        'turno' => $itemsTurno->first()->turno,
-                        'encuestados' => $encuestados,
-                        'promedios_areas' => $promediosAreas,
-                        'promedio_final' => $promedioFinal,
-                    ];
-                });
-            });
-
-            return [
-                'docente' => $docente,
-                'cursos' => $cursos,
-            ];
-        });
-
-        // 🔹 Construimos el ranking de docentes con 10 o más encuestados
-        $ranking = [];
-        foreach ($agrupado as $docenteInfo) {
-            foreach ($docenteInfo['cursos'] as $curso => $turnos) {
-                foreach ($turnos as $turno => $infoTurno) {
-                    if ($infoTurno['encuestados'] >= 10) {
-                        $ranking[] = [
-                            'docente' => $docenteInfo['docente'],
-                            'curso' => $curso,
-                            'grupo_horario' => $infoTurno['turno'],
-                            'encuestados' => $infoTurno['encuestados'],
-                            'promedios_areas' => $infoTurno['promedios_areas'],
-                            'promedio_final' => $infoTurno['promedio_final'],
-                        ];
-                    }
-                }
-            }
-        }
-
-        $ranking = collect($ranking)->sortByDesc('promedio_final')->values();
-
-        // 🔹 Generar PDF con los datos procesados
-        $pdf = PDF::loadView('reportes.reporte_general', [
-            'escuela' => $escuela,
-            'ranking' => $ranking
-        ])->setPaper('A4', 'portrait');
-
-        $folderPath = storage_path('app/reporte_general');
-        if (!file_exists($folderPath)) mkdir($folderPath, 0777, true);
-
-        $fileName = "Orden_de_merito_{$escuela}.pdf";
-        $pdf->save($folderPath . '/' . $fileName);
-
-        return response()->json([
-            'message' => '✅ Reporte generado correctamente',
-            'file' => "storage/app/reporte_general/$fileName"
-        ]);
-    }
-
-    /**
-     * Calcula los promedios por área y el promedio final de un curso
-     */
-    private function calcularPromedioCurso($preguntasPorArea, $encuestados)
-    {
-        $resumenAreas = [];
-        $totalNotas = 0;
-        $totalPreguntas = 0;
-
-        foreach ($preguntasPorArea as $area => $items) {
-
-            $sumaNotas = collect($items)->sum('nota_item_20');
-            $numPreguntas = count($items);
-
-            $promedioArea = $numPreguntas > 0
-                ? round($sumaNotas / $numPreguntas, 2)
-                : 0;
-
-            $resumenAreas[$area] = [
-                'promedio' => $promedioArea,
-                'preguntas' => $items
-            ];
-
-            $totalNotas += $promedioArea * $numPreguntas;
-            $totalPreguntas += $numPreguntas;
-        }
-
-        $promedioFinal = $totalPreguntas > 0
-            ? round($totalNotas / $totalPreguntas, 2)
-            : 0;
-
-        return [
-            'areas' => $resumenAreas,
-            'totalEncuestados' => $encuestados,
-            'promedioFinal' => $promedioFinal
-        ];
-    }
-
-
-    public function reportePorEscuela($codEscuela)
-    {
-        $escuela = DB::table('matricula')
-            ->where('COD_ESCUELA', $codEscuela)
+            ->where('TIPO', 'PREGRADO')
             ->value('NOM_ESCUELA');
 
         if (!$escuela) abort(404, 'La escuela no existe en la base de datos.');
 
         $facultad = DB::table('matricula')
             ->where('COD_ESCUELA', $codEscuela)
+            ->where('TIPO', 'PREGRADO')
             ->value('FACULTAD');
         if (!$facultad) $facultad = 'FACULTAD NO REGISTRADA';
 
@@ -568,6 +75,7 @@ class ReportePDFController extends Controller
                 'm.PROFESOR as docente',
                 'm.DES_CURSO as curso',
                 'm.COD_TURNO as turno',
+                'a.cod_area',
                 'a.nom_area',
                 'p.nom_pre as pregunta',
                 DB::raw('SUM(r.cod_alt = 1) as n1'),
@@ -576,20 +84,21 @@ class ReportePDFController extends Controller
                 DB::raw('SUM(r.cod_alt = 4) as n4'),
                 DB::raw('SUM(r.cod_alt = 5) as n5'),
                 DB::raw('COUNT(r.cod_alt) as total_respuestas'),
-                // DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
                 DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4) / NULLIF(
                     SUM(r.cod_alt = 1) + 
                     SUM(r.cod_alt = 2) + 
                     SUM(r.cod_alt = 3) + 
                     SUM(r.cod_alt = 4), 0)
                 ) * 5, 2) as nota_item_20')
-                )
+            )
             ->where('m.COD_ESCUELA', $codEscuela)
-            ->groupBy('m.COD_PRO', 'm.PROFESOR', 'm.DES_CURSO', 'm.COD_TURNO', 'a.nom_area', 'p.nom_pre')
+            ->where('r.tipo', 1) // Solo preguntas de tipo 1 (estudiantes)
+            ->where('m.TIPO', 'PREGRADO')
+            ->groupBy('m.COD_PRO', 'm.PROFESOR', 'm.DES_CURSO', 'm.COD_TURNO', 'a.cod_area', 'a.nom_area', 'p.nom_pre')
             ->orderBy('m.PROFESOR')
             ->orderBy('m.DES_CURSO')
             ->orderBy('m.COD_TURNO')
-            ->orderBy('a.nom_area')
+            ->orderBy('a.cod_area')
             ->orderBy('p.nom_pre')
             ->get();
 
@@ -647,21 +156,1102 @@ class ReportePDFController extends Controller
     }
 
 
-    public function reporteGeneral($codEscuela)
+    /**
+     * Calcula los promedios por área y el promedio final de un curso
+     */
+    private function calcularPromedioCurso($preguntasPorArea, $encuestados)
+    {
+        $resumenAreas = [];
+        $totalNotas = 0;
+        $totalPreguntas = 0;
+
+        foreach ($preguntasPorArea as $area => $items) {
+
+            $sumaNotas = collect($items)->sum('nota_item_20');
+            $numPreguntas = count($items);
+
+            $promedioArea = $numPreguntas > 0
+                ? round($sumaNotas / $numPreguntas, 2)
+                : 0;
+
+            $resumenAreas[$area] = [
+                'promedio' => $promedioArea,
+                'preguntas' => $items
+            ];
+
+            $totalNotas += $promedioArea * $numPreguntas;
+            $totalPreguntas += $numPreguntas;
+        }
+
+        $promedioFinal = $totalPreguntas > 0
+            ? round($totalNotas / $totalPreguntas, 2)
+            : 0;
+
+        return [
+            'areas' => $resumenAreas,
+            'totalEncuestados' => $encuestados,
+            'promedioFinal' => $promedioFinal
+        ];
+    }
+
+    /**
+     * Calcula los resultados a los estudiantes de cada escuela, sin importar el docente ni el curso
+     */
+    public function reportePorEscuela_PRIMERAVERSION($codEscuela)
     {
         $escuela = DB::table('matricula')
             ->where('COD_ESCUELA', $codEscuela)
+            ->where('TIPO', 'PREGRADO')
             ->value('NOM_ESCUELA');
 
         if (!$escuela) abort(404, 'La escuela no existe en la base de datos.');
 
         $facultad = DB::table('matricula')
             ->where('COD_ESCUELA', $codEscuela)
+            ->where('TIPO', 'PREGRADO')
             ->value('FACULTAD');
+
         if (!$facultad) $facultad = 'FACULTAD NO REGISTRADA';
 
+        // ======================================================
+        // DATOS BASE — SOLO PREGRADO, SOLO TIPO 1
+        // ======================================================
+        $datos = DB::table('enc_respuestas as r')
+            ->join('matricula as m', function ($join) {
+                $join->on('r.cod_alu', '=', 'm.COD_ALUMNO')
+                    ->on('r.cod_cur', '=', 'm.COD_CURSO')
+                    ->on('r.cod_pro', '=', 'm.COD_PRO')
+                    ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'))
+                    ->where('m.TIPO', 'PREGRADO');  // ← dentro del JOIN
+            })
+            ->join('enc_pregunta_general as p', 'r.cod_pre', '=', 'p.cod_pre')
+            ->join('enc_area_general as a', 'p.cod_area', '=', 'a.cod_area')
+            ->select(
+                'm.COD_PRO',
+                'm.PROFESOR as docente',
+                'm.DES_CURSO as curso',
+                'm.COD_TURNO as turno',
+                'a.cod_area',
+                'a.nom_area',
+                'p.nom_pre as pregunta',
+                DB::raw('SUM(r.cod_alt = 1) as n1'),
+                DB::raw('SUM(r.cod_alt = 2) as n2'),
+                DB::raw('SUM(r.cod_alt = 3) as n3'),
+                DB::raw('SUM(r.cod_alt = 4) as n4'),
+                DB::raw('SUM(r.cod_alt = 5) as n5'),
+                DB::raw('COUNT(r.cod_alt) as total_respuestas'),
+                DB::raw('ROUND(
+                (
+                    (
+                        SUM(r.cod_alt = 1) * 1 +
+                        SUM(r.cod_alt = 2) * 2 +
+                        SUM(r.cod_alt = 3) * 3 +
+                        SUM(r.cod_alt = 4) * 4
+                    )
+                    /
+                    NULLIF(
+                        SUM(r.cod_alt = 1) +
+                        SUM(r.cod_alt = 2) +
+                        SUM(r.cod_alt = 3) +
+                        SUM(r.cod_alt = 4),
+                    0)
+                ) * 5
+            , 2) as nota_item_20')
+            )
+            ->where('r.tipo', 1)            // ← solo respuestas de estudiantes
+            ->where('m.TIPO', 'PREGRADO')   // ← doble seguro en WHERE
+            ->where('m.COD_ESCUELA', $codEscuela)
+            ->groupBy(
+                'm.COD_PRO',
+                'm.PROFESOR',
+                'm.DES_CURSO',
+                'm.COD_TURNO',
+                'a.cod_area',
+                'a.nom_area',
+                'p.nom_pre'
+            )
+            ->orderBy('m.PROFESOR')
+            ->orderBy('m.DES_CURSO')
+            ->orderBy('m.COD_TURNO')
+            ->orderBy('a.cod_area')
+            ->orderBy('p.nom_pre')
+            ->get();
 
-        // --- DATOS BASE ---
+        // ======================================================
+        // AGRUPACIÓN
+        // ======================================================
+        $agrupado = $datos
+            ->groupBy('COD_PRO')
+            ->map(function ($itemsPorDocente) {
+
+                $docente = $itemsPorDocente->first()->docente;
+
+                // $cursos = $itemsPorDocente->groupBy('curso')->map(function ($itemsCurso) {
+
+                //     return $itemsCurso->groupBy('turno')->map(function ($itemsTurno) {
+
+                //         $preguntasPorArea = $itemsTurno->groupBy('nom_area');
+                //         $encuestados      = $itemsTurno->first()->total_respuestas ?? 0;
+
+                //         return $this->calcularPromedioCurso($preguntasPorArea, $encuestados);
+                //     });
+                // });
+                $cursos = $itemsPorDocente->groupBy('curso')->map(function ($itemsCurso) {
+
+                    return $itemsCurso->groupBy('turno')->map(function ($itemsTurno) {
+
+                        $preguntasPorArea = $itemsTurno->groupBy('nom_area');
+
+                        $encuestados = $itemsTurno->first()->total_respuestas ?? 0;
+
+                        // ======================================================
+                        // CALCULAR DATOS
+                        // ======================================================
+                        $dataCurso = $this->calcularPromedioCurso(
+                            $preguntasPorArea,
+                            $encuestados
+                        );
+
+                        // ======================================================
+                        // DATOS DEL GRÁFICO
+                        // ======================================================
+                        $labels = [];
+                        $notas  = [];
+
+                        foreach ($itemsTurno as $item) {
+
+                            $labels[] =
+                                mb_strimwidth($item->pregunta, 0, 55, '...');
+
+                            $notas[] =
+                                round($item->nota_item_20, 2);
+                        }
+
+                        // ======================================================
+                        // ALTURA PEQUEÑA PARA QUE ENTRE EN UNA HOJA
+                        // ======================================================
+                        $cantidadPreguntas = count($labels);
+
+                        $alturaChart = max(260, ($cantidadPreguntas * 22));
+
+                        // ======================================================
+                        // CONFIGURACIÓN QUICKCHART
+                        // ======================================================
+                        $chartConfig = [
+
+                            'type' => 'horizontalBar',
+
+                            'data' => [
+
+                                'labels' => $labels,
+
+                                'datasets' => [[
+
+                                    'data' => $notas,
+
+                                    'backgroundColor' => '#2563eb',
+
+                                    'borderColor' => '#1e40af',
+
+                                    'borderWidth' => 1,
+
+                                    'barThickness' => 12,
+                                ]]
+                            ],
+
+                            'options' => [
+
+                                'responsive' => false,
+
+                                'legend' => [
+                                    'display' => false
+                                ],
+
+                                'layout' => [
+                                    'padding' => [
+                                        'right' => 25,
+                                        'left'  => 5,
+                                        'top'   => 5,
+                                        'bottom' => 0
+                                    ]
+                                ],
+
+                                'scales' => [
+
+                                    'xAxes' => [[
+
+                                        'ticks' => [
+                                            'beginAtZero' => true,
+                                            'max' => 20,
+                                            'fontSize' => 9
+                                        ],
+
+                                        'gridLines' => [
+                                            'color' => '#dbeafe'
+                                        ]
+                                    ]],
+
+                                    'yAxes' => [[
+
+                                        'ticks' => [
+                                            'fontSize' => 8
+                                        ],
+
+                                        'gridLines' => [
+                                            'display' => false
+                                        ]
+                                    ]]
+                                ],
+
+                                'plugins' => [
+
+                                    'datalabels' => [
+
+                                        'display' => true,
+
+                                        'anchor' => 'end',
+
+                                        'align' => 'right',
+
+                                        'offset' => 2,
+
+                                        'color' => '#111827',
+
+                                        'font' => [
+                                            'size' => 8,
+                                            'weight' => 'bold'
+                                        ],
+
+                                        'formatter' =>
+                                        'function(value){ return value.toFixed(1); }'
+                                    ]
+                                ]
+                            ]
+                        ];
+
+                        // ======================================================
+                        // GENERAR IMAGEN
+                        // ======================================================
+                        $url =
+                            'https://quickchart.io/chart?width=700&height=' .
+                            $alturaChart .
+                            '&backgroundColor=white&format=png&c=' .
+                            urlencode(json_encode($chartConfig));
+
+                        try {
+
+                            $imgData = file_get_contents($url);
+
+                            $graficoBarras =
+                                'data:image/png;base64,' .
+                                base64_encode($imgData);
+                        } catch (\Exception $e) {
+
+                            $graficoBarras = null;
+                        }
+
+                        // ======================================================
+                        // AGREGAR GRÁFICO AL ARRAY
+                        // ======================================================
+                        $dataCurso['graficoBarras'] = $graficoBarras;
+
+                        return $dataCurso;
+                    });
+                });
+
+                return [
+                    'docente' => $docente,
+                    'cursos'  => $cursos,
+                ];
+            });
+
+        // ======================================================
+        // GENERAR PDF POR DOCENTE
+        // ======================================================
+        $folder = 'reportes/alumno/' . $codEscuela;
+        Storage::makeDirectory($folder);
+
+        foreach ($agrupado as $codPro => $info) {
+
+            $docente = $info['docente'];
+
+            $docenteFile = strtoupper(str_replace(
+                [' ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ñ'],
+                ['_', 'A', 'E', 'I', 'O', 'U', 'N'],
+                $docente
+            ));
+
+            $pdf = Pdf::loadView('reportes.estudiantes.por_escuela_docente', [
+                'escuela'     => $escuela,
+                'cod_escuela' => $codEscuela,
+                'docente'     => $docente,
+                'facultad'    => $facultad,
+                'cursos'      => $info['cursos'],
+            ]);
+
+            $fileName =
+                $folder .
+                '/REPORTE_' .
+                $docenteFile .
+                '_' .
+                $codPro .
+                '_' .
+                $codEscuela .
+                '.pdf';
+
+            Storage::put($fileName, $pdf->output());
+        }
+
+        return "✅ PDFs generados en storage/app/public/$folder";
+    }
+    public function reportePorEscuela($codEscuela)
+    {
+        // ======================================================
+        // ESCUELA Y FACULTAD — SOLO PREGRADO
+        // ======================================================
+        $escuela = DB::table('matricula')
+            ->where('COD_ESCUELA', $codEscuela)
+            ->where('TIPO', 'PREGRADO')
+            ->value('NOM_ESCUELA');
+
+        if (!$escuela) abort(404, 'La escuela no existe en la base de datos.');
+
+        $facultad = DB::table('matricula')
+            ->where('COD_ESCUELA', $codEscuela)
+            ->where('TIPO', 'PREGRADO')
+            ->value('FACULTAD') ?? 'FACULTAD NO REGISTRADA';
+
+        // ======================================================
+        // DATOS BASE — SOLO PREGRADO, SOLO TIPO 1
+        // ======================================================
+        $datos = DB::table('enc_respuestas as r')
+            ->join('matricula as m', function ($join) {
+                $join->on('r.cod_alu', '=', 'm.COD_ALUMNO')
+                    ->on('r.cod_cur', '=', 'm.COD_CURSO')
+                    ->on('r.cod_pro', '=', 'm.COD_PRO')
+                    ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'))
+                    ->where('m.TIPO', 'PREGRADO');
+            })
+            ->join('enc_pregunta_general as p', 'r.cod_pre', '=', 'p.cod_pre')
+            ->join('enc_area_general as a', 'p.cod_area', '=', 'a.cod_area')
+            ->select(
+                'm.COD_PRO',
+                'm.PROFESOR as docente',
+                'm.DES_CURSO as curso',
+                'm.COD_TURNO as turno',
+                'a.cod_area',
+                'a.nom_area',
+                'p.nom_pre as pregunta',
+                DB::raw('SUM(r.cod_alt = 1) as n1'),
+                DB::raw('SUM(r.cod_alt = 2) as n2'),
+                DB::raw('SUM(r.cod_alt = 3) as n3'),
+                DB::raw('SUM(r.cod_alt = 4) as n4'),
+                DB::raw('SUM(r.cod_alt = 5) as n5'),
+                DB::raw('COUNT(r.cod_alt) as total_respuestas'),
+                DB::raw('ROUND(
+                (
+                    (
+                        SUM(r.cod_alt = 1) * 1 +
+                        SUM(r.cod_alt = 2) * 2 +
+                        SUM(r.cod_alt = 3) * 3 +
+                        SUM(r.cod_alt = 4) * 4
+                    )
+                    /
+                    NULLIF(
+                        SUM(r.cod_alt = 1) +
+                        SUM(r.cod_alt = 2) +
+                        SUM(r.cod_alt = 3) +
+                        SUM(r.cod_alt = 4),
+                    0)
+                ) * 5
+            , 2) as nota_item_20')
+            )
+            ->where('r.tipo', 1)
+            ->where('m.TIPO', 'PREGRADO')
+            ->where('m.COD_ESCUELA', $codEscuela)
+            ->groupBy(
+                'm.COD_PRO',
+                'm.PROFESOR',
+                'm.DES_CURSO',
+                'm.COD_TURNO',
+                'a.cod_area',
+                'a.nom_area',
+                'p.nom_pre'
+            )
+            ->orderBy('m.PROFESOR')
+            ->orderBy('m.DES_CURSO')
+            ->orderBy('m.COD_TURNO')
+            ->orderBy('a.cod_area')
+            ->orderBy('p.nom_pre')
+            ->get();
+
+        if ($datos->isEmpty()) {
+            abort(404, 'No se encontraron datos para esta escuela.');
+        }
+
+        // ======================================================
+        // DATOS DEL ÚNICO DOCENTE
+        // ======================================================
+        $docente = $datos->first()->docente;
+        $codPro  = $datos->first()->COD_PRO;
+
+        // ======================================================
+        // AGRUPAR POR CURSO → TURNO (sin agrupar por docente)
+        // ======================================================
+        $cursos = $datos->groupBy('curso')->map(function ($itemsCurso) {
+
+            return $itemsCurso->groupBy('turno')->map(function ($itemsTurno) {
+
+                $preguntasPorArea = $itemsTurno->groupBy('nom_area');
+                $encuestados      = $itemsTurno->first()->total_respuestas ?? 0;
+
+                // ======================================================
+                // CALCULAR PROMEDIOS
+                // ======================================================
+                $dataCurso = $this->calcularPromedioCurso($preguntasPorArea, $encuestados);
+
+                // ======================================================
+                // DATOS DEL GRÁFICO
+                // ======================================================
+                $labels = [];
+                $notas  = [];
+
+                foreach ($itemsTurno as $item) {
+                    $labels[] = mb_strimwidth($item->pregunta, 0, 55, '...');
+                    $notas[]  = round($item->nota_item_20, 2);
+                }
+
+                $alturaChart = max(260, (count($labels) * 22));
+
+                $chartConfig = [
+                    'type' => 'horizontalBar',
+                    'data' => [
+                        'labels'   => $labels,
+                        'datasets' => [[
+                            'data'            => $notas,
+                            'backgroundColor' => '#2563eb',
+                            'borderColor'     => '#1e40af',
+                            'borderWidth'     => 1,
+                            'barThickness'    => 12,
+                        ]]
+                    ],
+                    'options' => [
+                        'responsive' => false,
+                        'legend'     => ['display' => false],
+                        'layout'     => ['padding' => ['right' => 25, 'left' => 5, 'top' => 5, 'bottom' => 0]],
+                        'scales' => [
+                            'xAxes' => [[
+                                'ticks'     => ['beginAtZero' => true, 'max' => 20, 'fontSize' => 9],
+                                'gridLines' => ['color' => '#dbeafe'],
+                            ]],
+                            'yAxes' => [[
+                                'ticks'     => ['fontSize' => 8],
+                                'gridLines' => ['display' => false],
+                            ]]
+                        ],
+                        'plugins' => [
+                            'datalabels' => [
+                                'display'   => true,
+                                'anchor'    => 'end',
+                                'align'     => 'right',
+                                'offset'    => 2,
+                                'color'     => '#111827',
+                                'font'      => ['size' => 8, 'weight' => 'bold'],
+                                'formatter' => 'function(value){ return value.toFixed(1); }',
+                            ]
+                        ]
+                    ]
+                ];
+
+                // ======================================================
+                // GENERAR IMAGEN BASE64
+                // ======================================================
+                $url =
+                    'https://quickchart.io/chart?width=700&height=' .
+                    $alturaChart .
+                    '&backgroundColor=white&format=png&c=' .
+                    urlencode(json_encode($chartConfig));
+
+                try {
+                    $dataCurso['graficoBarras'] = 'data:image/png;base64,' . base64_encode(file_get_contents($url));
+                } catch (\Exception $e) {
+                    $dataCurso['graficoBarras'] = null;
+                }
+
+                return $dataCurso;
+            });
+        });
+
+        // ======================================================
+        // NOMBRE DEL ARCHIVO
+        // ======================================================
+        $docenteFile = strtoupper(str_replace(
+            [' ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ñ'],
+            ['_', 'A', 'E', 'I', 'O', 'U', 'N'],
+            $docente
+        ));
+
+        $fileName = 'REPORTE_' . $docenteFile . '_' . $codPro . '_' . $codEscuela . '.pdf';
+
+        // ======================================================
+        // GENERAR Y DESCARGAR PDF DIRECTO
+        // ======================================================
+        return Pdf::loadView('reportes.estudiantes.por_escuela_docente', [
+            'escuela'     => $escuela,
+            'cod_escuela' => $codEscuela,
+            'docente'     => $docente,
+            'facultad'    => $facultad,
+            'cursos'      => $cursos,
+        ])->download($fileName);
+    }
+
+    public function reporteGraficoPorEscuela_PRIMERAVERSION($codEscuela)
+    {
+        // ======================================================
+        // ESCUELA Y FACULTAD — SOLO PREGRADO
+        // ======================================================
+        $escuela = DB::table('matricula')
+            ->where('COD_ESCUELA', $codEscuela)
+            ->where('TIPO', 'PREGRADO')
+            ->value('NOM_ESCUELA');
+
+        if (!$escuela) {
+            abort(404, 'La escuela no existe en la base de datos.');
+        }
+
+        $facultad = DB::table('matricula')
+            ->where('COD_ESCUELA', $codEscuela)
+            ->where('TIPO', 'PREGRADO')
+            ->value('FACULTAD');
+
+        if (!$facultad) {
+            $facultad = 'FACULTAD NO REGISTRADA';
+        }
+
+        // ======================================================
+        // DATOS BASE — MISMA LÓGICA QUE REPORTE TABLA
+        // SOLO PREGRADO + SOLO ENCUESTA TIPO 1
+        // ======================================================
+        $datos = DB::table('enc_respuestas as r')
+            ->join('matricula as m', function ($join) {
+                $join->on('r.cod_alu', '=', 'm.COD_ALUMNO')
+                    ->on('r.cod_cur', '=', 'm.COD_CURSO')
+                    ->on('r.cod_pro', '=', 'm.COD_PRO')
+                    ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'))
+                    ->where('m.TIPO', 'PREGRADO');
+            })
+            ->join('enc_pregunta_general as p', 'r.cod_pre', '=', 'p.cod_pre')
+            ->join('enc_area_general as a', 'p.cod_area', '=', 'a.cod_area')
+
+            ->select(
+                'm.COD_PRO',
+                'm.PROFESOR as docente',
+                'm.DES_CURSO as curso',
+                'm.COD_TURNO as turno',
+
+                'a.cod_area',
+                'a.nom_area',
+
+                'p.nom_pre as pregunta',
+
+                DB::raw('SUM(r.cod_alt = 1) as n1'),
+                DB::raw('SUM(r.cod_alt = 2) as n2'),
+                DB::raw('SUM(r.cod_alt = 3) as n3'),
+                DB::raw('SUM(r.cod_alt = 4) as n4'),
+                DB::raw('SUM(r.cod_alt = 5) as n5'),
+
+                DB::raw('COUNT(r.cod_alt) as total_respuestas'),
+
+                // ======================================================
+                // MISMA FÓRMULA EXACTA DEL REPORTE TABLA
+                // ======================================================
+                DB::raw('ROUND(
+                (
+                    (
+                        SUM(r.cod_alt = 1) * 1 +
+                        SUM(r.cod_alt = 2) * 2 +
+                        SUM(r.cod_alt = 3) * 3 +
+                        SUM(r.cod_alt = 4) * 4
+                    )
+                    /
+                    NULLIF(
+                        SUM(r.cod_alt = 1) +
+                        SUM(r.cod_alt = 2) +
+                        SUM(r.cod_alt = 3) +
+                        SUM(r.cod_alt = 4),
+                    0)
+                ) * 5
+            , 2) as nota_pregunta')
+            )
+
+            // ======================================================
+            // FILTROS IMPORTANTES
+            // ======================================================
+            ->where('r.tipo', 1)
+            ->where('m.TIPO', 'PREGRADO')
+            ->where('m.COD_ESCUELA', $codEscuela)
+
+            ->groupBy(
+                'm.COD_PRO',
+                'm.PROFESOR',
+                'm.DES_CURSO',
+                'm.COD_TURNO',
+                'a.cod_area',
+                'a.nom_area',
+                'p.nom_pre'
+            )
+
+            ->orderBy('m.PROFESOR')
+            ->orderBy('m.DES_CURSO')
+            ->orderBy('m.COD_TURNO')
+            ->orderBy('a.cod_area')
+            ->orderBy('p.nom_pre')
+
+            ->get();
+
+        // ======================================================
+        // AGRUPAR POR DOCENTE
+        // ======================================================
+        $agrupado = $datos->groupBy('COD_PRO');
+
+        // ======================================================
+        // CREAR CARPETA
+        // ======================================================
+        $folder = 'reportes_graficos/alumno/' . $codEscuela;
+
+        Storage::makeDirectory($folder);
+
+        // ======================================================
+        // GENERAR PDF POR DOCENTE
+        // ======================================================
+        foreach ($agrupado as $codPro => $items) {
+
+            $docente = $items->first()->docente;
+            $curso   = $items->first()->curso;
+            $turno   = $items->first()->turno;
+
+            // ======================================================
+            // DATOS DEL GRÁFICO
+            // ======================================================
+            $labelsPreguntas    = [];
+            $promediosPreguntas = [];
+
+            foreach ($items as $item) {
+
+                $labelsPreguntas[] =
+                    mb_strimwidth($item->pregunta, 0, 75, '...');
+
+                $promediosPreguntas[] =
+                    (float) $item->nota_pregunta;
+            }
+
+            // ======================================================
+            // PROMEDIO GENERAL
+            // MISMA LÓGICA DEL REPORTE TABLA
+            // ======================================================
+            $totalPonderado  = 0;
+            $totalRespuestas = 0;
+
+            foreach ($items as $item) {
+
+                $totalPonderado +=
+                    ($item->n1 * 1) +
+                    ($item->n2 * 2) +
+                    ($item->n3 * 3) +
+                    ($item->n4 * 4);
+
+                $totalRespuestas +=
+                    $item->n1 +
+                    $item->n2 +
+                    $item->n3 +
+                    $item->n4;
+            }
+
+            $promedioGeneral = $totalRespuestas > 0
+                ? round(($totalPonderado / $totalRespuestas) * 5, 2)
+                : 0;
+
+            // ======================================================
+            // CONFIGURACIÓN GRÁFICO
+            // ======================================================
+            $cantPreguntas = count($labelsPreguntas);
+
+            $alturaChart = max(450, ($cantPreguntas * 32) + 120);
+
+            $chartConfigBar = [
+
+                'type' => 'horizontalBar',
+
+                'data' => [
+
+                    'labels' => $labelsPreguntas,
+
+                    'datasets' => [[
+                        'label' => 'Nota Promedio',
+
+                        'data' => $promediosPreguntas,
+
+                        'backgroundColor' => '#1d4ed8',
+
+                        'borderColor' => '#1e3a8a',
+
+                        'borderWidth' => 1,
+
+                        'barThickness' => 14,
+                    ]]
+                ],
+
+                'options' => [
+
+                    'responsive' => false,
+
+                    'legend' => [
+                        'display' => false
+                    ],
+
+                    'title' => [
+                        'display' => false
+                    ],
+
+                    'layout' => [
+                        'padding' => [
+                            'left' => 15,
+                            'right' => 50,
+                            'top' => 15,
+                            'bottom' => 15
+                        ]
+                    ],
+
+                    'scales' => [
+
+                        'xAxes' => [[
+
+                            'ticks' => [
+                                'beginAtZero' => true,
+                                'max' => 20,
+                                'fontSize' => 11
+                            ],
+
+                            'gridLines' => [
+                                'color' => '#dbeafe'
+                            ]
+                        ]],
+
+                        'yAxes' => [[
+
+                            'ticks' => [
+                                'fontSize' => 10
+                            ],
+
+                            'gridLines' => [
+                                'display' => false
+                            ]
+                        ]]
+                    ],
+
+                    // ======================================================
+                    // MOSTRAR NOTA EN CADA BARRA
+                    // ======================================================
+                    'plugins' => [
+
+                        'datalabels' => [
+
+                            'display' => true,
+
+                            'color' => '#111827',
+
+                            'anchor' => 'end',
+
+                            'align' => 'right',
+
+                            'offset' => 4,
+
+                            'font' => [
+                                'weight' => 'bold',
+                                'size' => 10
+                            ],
+
+                            'formatter' => 'function(value){ return value.toFixed(2); }'
+                        ]
+                    ]
+                ]
+            ];
+
+            // ======================================================
+            // GENERAR IMAGEN BASE64
+            // ======================================================
+            $urlBarras =
+                'https://quickchart.io/chart?width=1100&height=' .
+                $alturaChart .
+                '&backgroundColor=white&format=png&c=' .
+                urlencode(json_encode($chartConfigBar));
+
+            try {
+
+                $imgData = file_get_contents($urlBarras);
+
+                $graficoBarras =
+                    'data:image/png;base64,' .
+                    base64_encode($imgData);
+            } catch (\Exception $e) {
+
+                $graficoBarras = null;
+            }
+
+            // ======================================================
+            // NOMBRE ARCHIVO
+            // ======================================================
+            $docenteFile = strtoupper(str_replace(
+                [' ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ñ'],
+                ['_', 'A', 'E', 'I', 'O', 'U', 'N'],
+                $docente
+            ));
+
+            // ======================================================
+            // GENERAR PDF
+            // ======================================================
+            $pdf = Pdf::loadView('reportes.estudiantes.grafico_por_escuela', [
+
+                'escuela'         => $escuela,
+                'facultad'        => $facultad,
+
+                'docente'         => $docente,
+
+                'curso'           => $curso,
+
+                'turno'           => $turno,
+
+                'promedioGeneral' => $promedioGeneral,
+
+                'graficoBarras'   => $graficoBarras,
+            ]);
+
+            // ======================================================
+            // GUARDAR PDF
+            // ======================================================
+            $fileName =
+                $folder .
+                '/GRAFICO_' .
+                $docenteFile .
+                '_' .
+                $codPro .
+                '.pdf';
+
+            Storage::put($fileName, $pdf->output());
+        }
+
+        return "✅ PDFs gráficos generados en storage/app/public/$folder";
+    }
+
+    public function reporteGraficoPorEscuela($codEscuela)
+    {
+        // ======================================================
+        // ESCUELA Y FACULTAD — SOLO PREGRADO
+        // ======================================================
+        $escuela = DB::table('matricula')
+            ->where('COD_ESCUELA', $codEscuela)
+            ->where('TIPO', 'PREGRADO')
+            ->value('NOM_ESCUELA');
+
+        if (!$escuela) {
+            abort(404, 'La escuela no existe en la base de datos.');
+        }
+
+        $facultad = DB::table('matricula')
+            ->where('COD_ESCUELA', $codEscuela)
+            ->where('TIPO', 'PREGRADO')
+            ->value('FACULTAD') ?? 'FACULTAD NO REGISTRADA';
+
+        // ======================================================
+        // DATOS BASE
+        // ======================================================
+        $datos = DB::table('enc_respuestas as r')
+            ->join('matricula as m', function ($join) {
+                $join->on('r.cod_alu', '=', 'm.COD_ALUMNO')
+                    ->on('r.cod_cur', '=', 'm.COD_CURSO')
+                    ->on('r.cod_pro', '=', 'm.COD_PRO')
+                    ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'))
+                    ->where('m.TIPO', 'PREGRADO');
+            })
+            ->join('enc_pregunta_general as p', 'r.cod_pre', '=', 'p.cod_pre')
+            ->join('enc_area_general as a', 'p.cod_area', '=', 'a.cod_area')
+            ->select(
+                'm.COD_PRO',
+                'm.PROFESOR as docente',
+                'm.DES_CURSO as curso',
+                'm.COD_TURNO as turno',
+                'a.cod_area',
+                'a.nom_area',
+                'p.nom_pre as pregunta',
+                DB::raw('SUM(r.cod_alt = 1) as n1'),
+                DB::raw('SUM(r.cod_alt = 2) as n2'),
+                DB::raw('SUM(r.cod_alt = 3) as n3'),
+                DB::raw('SUM(r.cod_alt = 4) as n4'),
+                DB::raw('COUNT(r.cod_alt) as total_respuestas'),
+                DB::raw('ROUND(
+                (
+                    (
+                        SUM(r.cod_alt = 1) * 1 +
+                        SUM(r.cod_alt = 2) * 2 +
+                        SUM(r.cod_alt = 3) * 3 +
+                        SUM(r.cod_alt = 4) * 4
+                    )
+                    /
+                    NULLIF(
+                        SUM(r.cod_alt = 1) +
+                        SUM(r.cod_alt = 2) +
+                        SUM(r.cod_alt = 3) +
+                        SUM(r.cod_alt = 4),
+                    0)
+                ) * 5
+            , 2) as nota_pregunta')
+            )
+            ->where('r.tipo', 1)
+            ->where('m.TIPO', 'PREGRADO')
+            ->where('m.COD_ESCUELA', $codEscuela)
+            ->groupBy(
+                'm.COD_PRO',
+                'm.PROFESOR',
+                'm.DES_CURSO',
+                'm.COD_TURNO',
+                'a.cod_area',
+                'a.nom_area',
+                'p.nom_pre'
+            )
+            ->orderBy('a.cod_area')
+            ->orderBy('p.nom_pre')
+            ->get();
+
+        if ($datos->isEmpty()) {
+            abort(404, 'No se encontraron datos para esta escuela.');
+        }
+
+        // ======================================================
+        // DATOS DEL ÚNICO DOCENTE
+        // ======================================================
+        $docente = $datos->first()->docente;
+        $codPro  = $datos->first()->COD_PRO;
+        $curso   = $datos->first()->curso;
+        $turno   = $datos->first()->turno;
+
+        // ======================================================
+        // DATOS DEL GRÁFICO
+        // ======================================================
+        $labelsPreguntas    = [];
+        $promediosPreguntas = [];
+
+        foreach ($datos as $item) {
+            $labelsPreguntas[]    = mb_strimwidth($item->pregunta, 0, 75, '...');
+            $promediosPreguntas[] = (float) $item->nota_pregunta;
+        }
+
+        // ======================================================
+        // PROMEDIO GENERAL
+        // ======================================================
+        $totalPonderado  = 0;
+        $totalRespuestas = 0;
+
+        foreach ($datos as $item) {
+            $totalPonderado  += ($item->n1 * 1) + ($item->n2 * 2) + ($item->n3 * 3) + ($item->n4 * 4);
+            $totalRespuestas += $item->n1 + $item->n2 + $item->n3 + $item->n4;
+        }
+
+        $promedioGeneral = $totalRespuestas > 0
+            ? round(($totalPonderado / $totalRespuestas) * 5, 2)
+            : 0;
+
+        // ======================================================
+        // CONFIGURACIÓN GRÁFICO
+        // ======================================================
+        $alturaChart = max(450, (count($labelsPreguntas) * 32) + 120);
+
+        $chartConfigBar = [
+            'type' => 'horizontalBar',
+            'data' => [
+                'labels'   => $labelsPreguntas,
+                'datasets' => [[
+                    'label'           => 'Nota Promedio',
+                    'data'            => $promediosPreguntas,
+                    'backgroundColor' => '#1d4ed8',
+                    'borderColor'     => '#1e3a8a',
+                    'borderWidth'     => 1,
+                    'barThickness'    => 14,
+                ]]
+            ],
+            'options' => [
+                'responsive' => false,
+                'legend'     => ['display' => false],
+                'title'      => ['display' => false],
+                'layout'     => ['padding' => ['left' => 15, 'right' => 50, 'top' => 15, 'bottom' => 15]],
+                'scales' => [
+                    'xAxes' => [[
+                        'ticks'     => ['beginAtZero' => true, 'max' => 20, 'fontSize' => 11],
+                        'gridLines' => ['color' => '#dbeafe'],
+                    ]],
+                    'yAxes' => [[
+                        'ticks'     => ['fontSize' => 10],
+                        'gridLines' => ['display' => false],
+                    ]]
+                ],
+                'plugins' => [
+                    'datalabels' => [
+                        'display'   => true,
+                        'color'     => '#111827',
+                        'anchor'    => 'end',
+                        'align'     => 'right',
+                        'offset'    => 4,
+                        'font'      => ['weight' => 'bold', 'size' => 10],
+                        'formatter' => 'function(value){ return value.toFixed(2); }',
+                    ]
+                ]
+            ]
+        ];
+
+        // ======================================================
+        // GENERAR IMAGEN BASE64
+        // ======================================================
+        $urlBarras =
+            'https://quickchart.io/chart?width=1100&height=' .
+            $alturaChart .
+            '&backgroundColor=white&format=png&c=' .
+            urlencode(json_encode($chartConfigBar));
+
+        try {
+            $graficoBarras = 'data:image/png;base64,' . base64_encode(file_get_contents($urlBarras));
+        } catch (\Exception $e) {
+            $graficoBarras = null;
+        }
+
+        // ======================================================
+        // NOMBRE DEL ARCHIVO
+        // ======================================================
+        $docenteFile = strtoupper(str_replace(
+            [' ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ñ'],
+            ['_', 'A', 'E', 'I', 'O', 'U', 'N'],
+            $docente
+        ));
+
+        $fileName = 'GRAFICO_' . $docenteFile . '_' . $codPro . '.pdf';
+
+        // ======================================================
+        // GENERAR Y DESCARGAR PDF DIRECTO
+        // ======================================================
+        return Pdf::loadView('reportes.estudiantes.grafico_por_escuela', [
+            'escuela'         => $escuela,
+            'facultad'        => $facultad,
+            'docente'         => $docente,
+            'curso'           => $curso,
+            'turno'           => $turno,
+            'promedioGeneral' => $promedioGeneral,
+            'graficoBarras'   => $graficoBarras,
+        ])->download($fileName);
+    }
+
+    public function reporteGraficoGeneral()
+    {
+        // ======================================================
+        // DATOS POR PREGUNTA — SOLO PREGRADO
+        // ======================================================
         $datos = DB::table('enc_respuestas as r')
             ->join('matricula as m', function ($join) {
                 $join->on('r.cod_alu', '=', 'm.COD_ALUMNO')
@@ -671,11 +1261,263 @@ class ReportePDFController extends Controller
             })
             ->join('enc_pregunta_general as p', 'r.cod_pre', '=', 'p.cod_pre')
             ->join('enc_area_general as a', 'p.cod_area', '=', 'a.cod_area')
+            ->where('m.TIPO', 'PREGRADO')
+            ->select(
+                'a.cod_area',
+                'a.nom_area',
+                'p.cod_pre',
+                'p.nom_pre as pregunta',
+
+                DB::raw('SUM(r.cod_alt = 1) as n1'),
+                DB::raw('SUM(r.cod_alt = 2) as n2'),
+                DB::raw('SUM(r.cod_alt = 3) as n3'),
+                DB::raw('SUM(r.cod_alt = 4) as n4'),
+
+                DB::raw('ROUND(
+                (
+                    (
+                        SUM(r.cod_alt = 1) * 1 +
+                        SUM(r.cod_alt = 2) * 2 +
+                        SUM(r.cod_alt = 3) * 3 +
+                        SUM(r.cod_alt = 4) * 4
+                    )
+                    /
+                    NULLIF(
+                        SUM(r.cod_alt = 1) +
+                        SUM(r.cod_alt = 2) +
+                        SUM(r.cod_alt = 3) +
+                        SUM(r.cod_alt = 4),
+                    0)
+                ) * 5
+            , 2) as nota_pregunta')
+            )
+            ->groupBy(
+                'a.cod_area',
+                'a.nom_area',
+                'p.cod_pre',
+                'p.nom_pre'
+            )
+            ->orderBy('a.cod_area')
+            ->orderBy('p.cod_pre')
+            ->get();
+
+        if ($datos->isEmpty()) {
+            abort(404, 'No hay respuestas de tipo PREGRADO registradas.');
+        }
+
+        // ======================================================
+        // TOTAL ENCUESTADOS ÚNICOS
+        // ======================================================
+        $totalEncuestados = DB::table('matricula')
+            ->where('TIPO', 'PREGRADO')
+            ->where('ENCUESTADO', 1)
+            ->count();
+
+        // ======================================================
+        // TOTALES GLOBALES
+        // ======================================================
+        $totalN1 = $datos->sum('n1');
+        $totalN2 = $datos->sum('n2');
+        $totalN3 = $datos->sum('n3');
+        $totalN4 = $datos->sum('n4');
+
+        $totalPonderado =
+            ($totalN1 * 1) +
+            ($totalN2 * 2) +
+            ($totalN3 * 3) +
+            ($totalN4 * 4);
+
+        $totalRespuestas = $totalN1 + $totalN2 + $totalN3 + $totalN4;
+
+        $promedioGeneral = $totalRespuestas > 0
+            ? round(($totalPonderado / $totalRespuestas) * 5, 2)
+            : 0;
+
+        // ======================================================
+        // AGRUPAR POR ÁREA PARA LA TABLA
+        // ======================================================
+        $areas = [];
+
+        foreach ($datos->groupBy('nom_area') as $nomArea => $preguntas) {
+
+            $ponderadoArea  = 0;
+            $respuestasArea = 0;
+
+            foreach ($preguntas as $p) {
+                $ponderadoArea  += ($p->n1 * 1) + ($p->n2 * 2) + ($p->n3 * 3) + ($p->n4 * 4);
+                $respuestasArea += $p->n1 + $p->n2 + $p->n3 + $p->n4;
+            }
+
+            $areas[$nomArea] = [
+                'preguntas'      => $preguntas,
+                'promedioArea'   => $respuestasArea > 0
+                    ? round(($ponderadoArea / $respuestasArea) * 5, 2)
+                    : 0,
+            ];
+        }
+
+        // ======================================================
+        // DATOS PARA EL GRÁFICO DE BARRAS
+        // ======================================================
+        $labelsPreguntas    = [];
+        $promediosPreguntas = [];
+        $coloresBarras      = [];
+
+        $paleta = [
+            '#1e3a8a',
+            '#0f766e',
+            '#7c3aed',
+            '#b45309',
+            '#0369a1',
+            '#15803d',
+            '#c2410c',
+            '#6d28d9',
+        ];
+
+        $areaIndex  = 0;
+        $areaActual = null;
+
+        foreach ($datos as $item) {
+
+            if ($item->nom_area !== $areaActual) {
+                $areaActual = $item->nom_area;
+                $areaIndex++;
+            }
+
+            $color = $paleta[($areaIndex - 1) % count($paleta)];
+
+            $labelsPreguntas[]    = mb_strimwidth($item->pregunta, 0, 60, '...');
+            $promediosPreguntas[] = (float) $item->nota_pregunta;
+            $coloresBarras[]      = $color;
+        }
+
+        // ======================================================
+        // CONFIGURACIÓN GRÁFICO DE BARRAS HORIZONTAL
+        // ======================================================
+        $cantPreguntas = count($labelsPreguntas);
+        $alturaChart   = max(300, $cantPreguntas * 28 + 60);
+
+        $chartConfigBar = [
+            'type' => 'horizontalBar',
+
+            'data' => [
+                'labels'   => $labelsPreguntas,
+                'datasets' => [[
+                    'label'           => 'Nota Promedio',
+                    'data'            => $promediosPreguntas,
+                    'backgroundColor' => $coloresBarras,
+                    'borderColor'     => '#0f172a',
+                    'borderWidth'     => 1,
+                    'barThickness'    => 12,
+                ]]
+            ],
+
+            'options' => [
+                'responsive' => false,
+                'legend'     => ['display' => false],
+                'title'      => ['display' => false],
+
+                'layout' => [
+                    'padding' => [
+                        'right'  => 40,
+                        'left'   => 10,
+                        'top'    => 10,
+                        'bottom' => 10,
+                    ]
+                ],
+
+                'scales' => [
+                    'xAxes' => [[
+                        'ticks' => [
+                            'beginAtZero' => true,
+                            'max'         => 20,
+                            'fontSize'    => 11,
+                        ],
+                        'gridLines' => ['color' => '#e2e8f0'],
+                    ]],
+                    'yAxes' => [[
+                        'ticks' => ['fontSize' => 9],
+                    ]],
+                ],
+
+                'plugins' => [
+                    'datalabels' => [
+                        'color'  => '#0f172a',
+                        'anchor' => 'end',
+                        'align'  => 'right',
+                        'font'   => ['weight' => 'bold', 'size' => 9],
+                    ]
+                ]
+            ]
+        ];
+
+        // ======================================================
+        // CONVERTIR A BASE64 PARA DOMPDF
+        // ======================================================
+        $urlBarras =
+            'https://quickchart.io/chart?width=800&height=' . $alturaChart .
+            '&backgroundColor=white&format=png&c=' .
+            urlencode(json_encode($chartConfigBar));
+
+        try {
+            $imgData       = file_get_contents($urlBarras);
+            $graficoBarras = 'data:image/png;base64,' . base64_encode($imgData);
+        } catch (\Exception $e) {
+            $graficoBarras = null;
+        }
+
+        // ======================================================
+        // GENERAR Y DESCARGAR PDF
+        // ======================================================
+        $pdf = Pdf::loadView('reportes.estudiantes.grafico_general', [
+            'promedioGeneral'  => $promedioGeneral,
+            'totalRespuestas'  => $totalRespuestas,
+            'totalEncuestados' => $totalEncuestados,
+            'areas'            => $areas,
+            'graficoBarras'    => $graficoBarras,
+        ]);
+
+        return $pdf->download('REPORTE_GENERAL_ALUMNOS.pdf');
+    }
+
+    /**
+     * Calcula los resultados a los docentes de cada escuela, sin importar el curso
+     */
+    public function reportePorEscuelaDocente_PRIMERAVERSION($codEscuela)
+    {
+        $escuela = DB::table('matricula')
+            ->where('COD_ESCUELA', $codEscuela)
+            ->where('TIPO', 'ESPECIALIDAD')
+            ->value('NOM_ESCUELA');
+
+        if (!$escuela) abort(404, 'La escuela no existe en la base de datos.');
+
+        $facultad = DB::table('matricula')
+            ->where('COD_ESCUELA', $codEscuela)
+            ->where('TIPO', 'ESPECIALIDAD')
+            ->value('FACULTAD');
+
+        if (!$facultad) $facultad = 'FACULTAD NO REGISTRADA';
+
+        // ======================================================
+        // DATOS BASE — SOLO ESPECIALIDAD, SOLO TIPO 2
+        // ======================================================
+        $datos = DB::table('enc_respuestas as r')
+            ->join('matricula as m', function ($join) {
+                $join->on('r.cod_alu', '=', 'm.COD_ALUMNO')
+                    ->on('r.cod_cur', '=', 'm.COD_CURSO')
+                    ->on('r.cod_pro', '=', 'm.COD_PRO')
+                    ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'))
+                    ->where('m.TIPO', 'ESPECIALIDAD');  // ← dentro del JOIN
+            })
+            ->join('enc_pregunta_general as p', 'r.cod_pre', '=', 'p.cod_pre')
+            ->join('enc_area_general as a', 'p.cod_area', '=', 'a.cod_area')
             ->select(
                 'm.COD_PRO',
                 'm.PROFESOR as docente',
                 'm.DES_CURSO as curso',
                 'm.COD_TURNO as turno',
+                'a.cod_area',
                 'a.nom_area',
                 'p.nom_pre as pregunta',
                 DB::raw('SUM(r.cod_alt = 1) as n1'),
@@ -684,101 +1526,1246 @@ class ReportePDFController extends Controller
                 DB::raw('SUM(r.cod_alt = 4) as n4'),
                 DB::raw('SUM(r.cod_alt = 5) as n5'),
                 DB::raw('COUNT(r.cod_alt) as total_respuestas'),
-                // DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4 + SUM(r.cod_alt = 5)*5) / NULLIF(COUNT(r.cod_alt), 0)) * 4, 2) as nota_item_20')
-                DB::raw('ROUND(((SUM(r.cod_alt = 1)*1 + SUM(r.cod_alt = 2)*2 + SUM(r.cod_alt = 3)*3 + SUM(r.cod_alt = 4)*4) / NULLIF(
-                    SUM(r.cod_alt = 1) + 
-                    SUM(r.cod_alt = 2) + 
-                    SUM(r.cod_alt = 3) + 
-                    SUM(r.cod_alt = 4), 0)
-                ) * 5, 2) as nota_item_20')
-                )
+                DB::raw('ROUND(
+                (
+                    (
+                        SUM(r.cod_alt = 1) * 1 +
+                        SUM(r.cod_alt = 2) * 2 +
+                        SUM(r.cod_alt = 3) * 3 +
+                        SUM(r.cod_alt = 4) * 4
+                    )
+                    /
+                    NULLIF(
+                        SUM(r.cod_alt = 1) +
+                        SUM(r.cod_alt = 2) +
+                        SUM(r.cod_alt = 3) +
+                        SUM(r.cod_alt = 4),
+                    0)
+                ) * 5
+            , 2) as nota_item_20')
+            )
+            ->where('r.tipo', 3)            // ← solo respuestas de DOCENTES
+            ->where('m.TIPO', 'ESPECIALIDAD')   // ← doble seguro en WHERE
             ->where('m.COD_ESCUELA', $codEscuela)
-            ->groupBy('m.COD_PRO', 'm.PROFESOR', 'm.DES_CURSO', 'm.COD_TURNO', 'a.nom_area', 'p.nom_pre')
+            ->groupBy(
+                'm.COD_PRO',
+                'm.PROFESOR',
+                'm.DES_CURSO',
+                'm.COD_TURNO',
+                'a.cod_area',
+                'a.nom_area',
+                'p.nom_pre'
+            )
             ->orderBy('m.PROFESOR')
             ->orderBy('m.DES_CURSO')
             ->orderBy('m.COD_TURNO')
-            ->orderBy('a.nom_area')
+            ->orderBy('a.cod_area')
             ->orderBy('p.nom_pre')
             ->get();
 
-        // --- AGRUPACIÓN ---
-        $agrupado = $datos->groupBy('COD_PRO')->map(function ($itemsDocente) {
+        // ======================================================
+        // AGRUPACIÓN
+        // ======================================================
+        $agrupado = $datos
+            ->groupBy('COD_PRO')
+            ->map(function ($itemsPorDocente) {
 
-            $docente = $itemsDocente->first()->docente;
+                $docente = $itemsPorDocente->first()->docente;
 
-            $cursos = $itemsDocente->groupBy('curso')->map(function ($itemsCurso) {
+                // $cursos = $itemsPorDocente->groupBy('curso')->map(function ($itemsCurso) {
 
-                return $itemsCurso->groupBy('turno')->map(function ($itemsTurno) {
+                //     return $itemsCurso->groupBy('turno')->map(function ($itemsTurno) {
 
-                    $preguntasPorArea = $itemsTurno->groupBy('nom_area');
-                    $encuestados = $itemsTurno->first()->total_respuestas ?? 0;
+                //         $preguntasPorArea = $itemsTurno->groupBy('nom_area');
+                //         $encuestados      = $itemsTurno->first()->total_respuestas ?? 0;
 
-                    // --- USAR FUNCIÓN UNIFICADA ---
-                    $resultado = $this->calcularPromedioCurso($preguntasPorArea, $encuestados);
+                //         return $this->calcularPromedioCurso($preguntasPorArea, $encuestados);
+                //     });
+                // });
+                $cursos = $itemsPorDocente->groupBy('curso')->map(function ($itemsCurso) {
 
-                    return [
-                        'turno' => $itemsTurno->first()->turno,
-                        'encuestados' => $resultado['totalEncuestados'],
-                        'areas' => $resultado['areas'],              // ← exactamente como en reportePorEscuela
-                        'promedio_final' => $resultado['promedioFinal'], // ← EXACTAMENTE igual
-                    ];
+                    return $itemsCurso->groupBy('turno')->map(function ($itemsTurno) {
+
+                        $preguntasPorArea = $itemsTurno->groupBy('nom_area');
+
+                        $encuestados = $itemsTurno->first()->total_respuestas ?? 0;
+
+                        // ======================================================
+                        // CALCULAR DATOS
+                        // ======================================================
+                        $dataCurso = $this->calcularPromedioCurso(
+                            $preguntasPorArea,
+                            $encuestados
+                        );
+
+                        // ======================================================
+                        // DATOS DEL GRÁFICO
+                        // ======================================================
+                        $labels = [];
+                        $notas  = [];
+
+                        foreach ($itemsTurno as $item) {
+
+                            $labels[] =
+                                mb_strimwidth($item->pregunta, 0, 55, '...');
+
+                            $notas[] =
+                                round($item->nota_item_20, 2);
+                        }
+
+                        // ======================================================
+                        // ALTURA PEQUEÑA PARA QUE ENTRE EN UNA HOJA
+                        // ======================================================
+                        $cantidadPreguntas = count($labels);
+
+                        $alturaChart = max(260, ($cantidadPreguntas * 22));
+
+                        // ======================================================
+                        // CONFIGURACIÓN QUICKCHART
+                        // ======================================================
+                        $chartConfig = [
+
+                            'type' => 'horizontalBar',
+
+                            'data' => [
+
+                                'labels' => $labels,
+
+                                'datasets' => [[
+
+                                    'data' => $notas,
+
+                                    'backgroundColor' => '#2563eb',
+
+                                    'borderColor' => '#1e40af',
+
+                                    'borderWidth' => 1,
+
+                                    'barThickness' => 12,
+                                ]]
+                            ],
+
+                            'options' => [
+
+                                'responsive' => false,
+
+                                'legend' => [
+                                    'display' => false
+                                ],
+
+                                'layout' => [
+                                    'padding' => [
+                                        'right' => 25,
+                                        'left'  => 5,
+                                        'top'   => 5,
+                                        'bottom' => 0
+                                    ]
+                                ],
+
+                                'scales' => [
+
+                                    'xAxes' => [[
+
+                                        'ticks' => [
+                                            'beginAtZero' => true,
+                                            'max' => 20,
+                                            'fontSize' => 9
+                                        ],
+
+                                        'gridLines' => [
+                                            'color' => '#dbeafe'
+                                        ]
+                                    ]],
+
+                                    'yAxes' => [[
+
+                                        'ticks' => [
+                                            'fontSize' => 8
+                                        ],
+
+                                        'gridLines' => [
+                                            'display' => false
+                                        ]
+                                    ]]
+                                ],
+
+                                'plugins' => [
+
+                                    'datalabels' => [
+
+                                        'display' => true,
+
+                                        'anchor' => 'end',
+
+                                        'align' => 'right',
+
+                                        'offset' => 2,
+
+                                        'color' => '#111827',
+
+                                        'font' => [
+                                            'size' => 8,
+                                            'weight' => 'bold'
+                                        ],
+
+                                        'formatter' =>
+                                        'function(value){ return value.toFixed(1); }'
+                                    ]
+                                ]
+                            ]
+                        ];
+
+                        // ======================================================
+                        // GENERAR IMAGEN
+                        // ======================================================
+                        $url =
+                            'https://quickchart.io/chart?width=700&height=' .
+                            $alturaChart .
+                            '&backgroundColor=white&format=png&c=' .
+                            urlencode(json_encode($chartConfig));
+
+                        try {
+
+                            $imgData = file_get_contents($url);
+
+                            $graficoBarras =
+                                'data:image/png;base64,' .
+                                base64_encode($imgData);
+                        } catch (\Exception $e) {
+
+                            $graficoBarras = null;
+                        }
+
+                        // ======================================================
+                        // AGREGAR GRÁFICO AL ARRAY
+                        // ======================================================
+                        $dataCurso['graficoBarras'] = $graficoBarras;
+
+                        return $dataCurso;
+                    });
                 });
+
+                return [
+                    'docente' => $docente,
+                    'cursos'  => $cursos,
+                ];
             });
 
-            return [
-                'docente' => $docente,
-                'cursos' => $cursos
-            ];
-        });
+        // ======================================================
+        // GENERAR PDF POR DOCENTE
+        // ======================================================
+        $folder = 'reportes/docentes/' . $codEscuela;
+        Storage::makeDirectory($folder);
 
-        // --- RANKING ---
-        $ranking = [];
+        foreach ($agrupado as $codPro => $info) {
 
-        foreach ($agrupado as $docenteInfo) {
-            foreach ($docenteInfo['cursos'] as $curso => $turnos) {
-                foreach ($turnos as $turno => $infoTurno) {
+            $docente = $info['docente'];
 
-                    if ($infoTurno['encuestados'] >= 10) {
-                        $ranking[] = [
-                            'docente' => $docenteInfo['docente'],
-                            'curso' => $curso,
-                            'grupo_horario' => $infoTurno['turno'],
-                            'encuestados' => $infoTurno['encuestados'],
-                            'promedios_areas' => collect($infoTurno['areas'])->map(fn($a) => $a['promedio']),
-                            'promedio_final' => $infoTurno['promedio_final'],
-                        ];
-                    }
-                }
-            }
+            $docenteFile = strtoupper(str_replace(
+                [' ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ñ'],
+                ['_', 'A', 'E', 'I', 'O', 'U', 'N'],
+                $docente
+            ));
+
+            $pdf = Pdf::loadView('reportes.docentes.por_escuela_docente', [
+                'escuela'     => $escuela,
+                'cod_escuela' => $codEscuela,
+                'docente'     => $docente,
+                'facultad'    => $facultad,
+                'cursos'      => $info['cursos'],
+            ]);
+
+            $fileName =
+                $folder .
+                '/REPORTE_' .
+                $docenteFile .
+                '_' .
+                $codPro .
+                '_' .
+                $codEscuela .
+                '.pdf';
+
+            Storage::put($fileName, $pdf->output());
         }
 
-        $ranking = collect($ranking)->sortByDesc('promedio_final')->values();
-
-        // --- PDF ---
-        $pdf = PDF::loadView('reportes.reporte_general', [
-            'escuela' => $escuela,
-            'facultad' => $facultad,
-            'ranking' => $ranking
-        ])->setPaper('A4', 'portrait');
-
-        $folderPath = storage_path('app/reporte_general');
-        if (!file_exists($folderPath)) mkdir($folderPath, 0777, true);
-
-        $fileName = "Orden_de_merito_{$escuela}.pdf";
-        $pdf->save($folderPath . '/' . $fileName);
-
-        return response()->json([
-            'message' => '✅ Reporte generado correctamente',
-            'file' => "storage/app/reporte_general/$fileName"
-        ]);
+        return "✅ PDFs generados en storage/app/public/$folder";
     }
 
+    public function reportePorEscuelaDocente($codEscuela)
+    {
+        // ======================================================
+        // ESCUELA Y FACULTAD — SOLO ESPECIALIDAD
+        // ======================================================
+        $escuela = DB::table('matricula')
+            ->where('COD_ESCUELA', $codEscuela)
+            ->where('TIPO', 'ESPECIALIDAD')
+            ->value('NOM_ESCUELA');
 
+        if (!$escuela) abort(404, 'La escuela no existe en la base de datos.');
 
+        $facultad = DB::table('matricula')
+            ->where('COD_ESCUELA', $codEscuela)
+            ->where('TIPO', 'ESPECIALIDAD')
+            ->value('FACULTAD') ?? 'FACULTAD NO REGISTRADA';
 
+        // ======================================================
+        // DATOS BASE — SOLO ESPECIALIDAD, SOLO TIPO 3
+        // ======================================================
+        $datos = DB::table('enc_respuestas as r')
+            ->join('matricula as m', function ($join) {
+                $join->on('r.cod_alu', '=', 'm.COD_ALUMNO')
+                    ->on('r.cod_cur', '=', 'm.COD_CURSO')
+                    ->on('r.cod_pro', '=', 'm.COD_PRO')
+                    ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'))
+                    ->where('m.TIPO', 'ESPECIALIDAD');
+            })
+            ->join('enc_pregunta_general as p', 'r.cod_pre', '=', 'p.cod_pre')
+            ->join('enc_area_general as a', 'p.cod_area', '=', 'a.cod_area')
+            ->select(
+                'm.COD_PRO',
+                'm.PROFESOR as docente',
+                'm.DES_CURSO as curso',
+                'm.COD_TURNO as turno',
+                'a.cod_area',
+                'a.nom_area',
+                'p.nom_pre as pregunta',
+                DB::raw('SUM(r.cod_alt = 1) as n1'),
+                DB::raw('SUM(r.cod_alt = 2) as n2'),
+                DB::raw('SUM(r.cod_alt = 3) as n3'),
+                DB::raw('SUM(r.cod_alt = 4) as n4'),
+                DB::raw('SUM(r.cod_alt = 5) as n5'),
+                DB::raw('COUNT(r.cod_alt) as total_respuestas'),
+                DB::raw('ROUND(
+                (
+                    (
+                        SUM(r.cod_alt = 1) * 1 +
+                        SUM(r.cod_alt = 2) * 2 +
+                        SUM(r.cod_alt = 3) * 3 +
+                        SUM(r.cod_alt = 4) * 4
+                    )
+                    /
+                    NULLIF(
+                        SUM(r.cod_alt = 1) +
+                        SUM(r.cod_alt = 2) +
+                        SUM(r.cod_alt = 3) +
+                        SUM(r.cod_alt = 4),
+                    0)
+                ) * 5
+            , 2) as nota_item_20')
+            )
+            ->where('r.tipo', 3)
+            ->where('m.TIPO', 'ESPECIALIDAD')
+            ->where('m.COD_ESCUELA', $codEscuela)
+            ->groupBy(
+                'm.COD_PRO',
+                'm.PROFESOR',
+                'm.DES_CURSO',
+                'm.COD_TURNO',
+                'a.cod_area',
+                'a.nom_area',
+                'p.nom_pre'
+            )
+            ->orderBy('m.PROFESOR')
+            ->orderBy('m.DES_CURSO')
+            ->orderBy('m.COD_TURNO')
+            ->orderBy('a.cod_area')
+            ->orderBy('p.nom_pre')
+            ->get();
 
+        if ($datos->isEmpty()) {
+            abort(404, 'No se encontraron datos para esta escuela.');
+        }
 
+        // ======================================================
+        // DATOS DEL ÚNICO DOCENTE
+        // ======================================================
+        $docente = $datos->first()->docente;
+        $codPro  = $datos->first()->COD_PRO;
 
+        // ======================================================
+        // AGRUPAR POR CURSO → TURNO (sin nivel de docente)
+        // ======================================================
+        $cursos = $datos->groupBy('curso')->map(function ($itemsCurso) {
+
+            return $itemsCurso->groupBy('turno')->map(function ($itemsTurno) {
+
+                $preguntasPorArea = $itemsTurno->groupBy('nom_area');
+                $encuestados      = $itemsTurno->first()->total_respuestas ?? 0;
+
+                // ======================================================
+                // CALCULAR PROMEDIOS
+                // ======================================================
+                $dataCurso = $this->calcularPromedioCurso($preguntasPorArea, $encuestados);
+
+                // ======================================================
+                // DATOS DEL GRÁFICO
+                // ======================================================
+                $labels = [];
+                $notas  = [];
+
+                foreach ($itemsTurno as $item) {
+                    $labels[] = mb_strimwidth($item->pregunta, 0, 55, '...');
+                    $notas[]  = round($item->nota_item_20, 2);
+                }
+
+                $alturaChart = max(260, (count($labels) * 22));
+
+                $chartConfig = [
+                    'type' => 'horizontalBar',
+                    'data' => [
+                        'labels'   => $labels,
+                        'datasets' => [[
+                            'data'            => $notas,
+                            'backgroundColor' => '#2563eb',
+                            'borderColor'     => '#1e40af',
+                            'borderWidth'     => 1,
+                            'barThickness'    => 12,
+                        ]]
+                    ],
+                    'options' => [
+                        'responsive' => false,
+                        'legend'     => ['display' => false],
+                        'layout'     => ['padding' => ['right' => 25, 'left' => 5, 'top' => 5, 'bottom' => 0]],
+                        'scales' => [
+                            'xAxes' => [[
+                                'ticks'     => ['beginAtZero' => true, 'max' => 20, 'fontSize' => 9],
+                                'gridLines' => ['color' => '#dbeafe'],
+                            ]],
+                            'yAxes' => [[
+                                'ticks'     => ['fontSize' => 8],
+                                'gridLines' => ['display' => false],
+                            ]]
+                        ],
+                        'plugins' => [
+                            'datalabels' => [
+                                'display'   => true,
+                                'anchor'    => 'end',
+                                'align'     => 'right',
+                                'offset'    => 2,
+                                'color'     => '#111827',
+                                'font'      => ['size' => 8, 'weight' => 'bold'],
+                                'formatter' => 'function(value){ return value.toFixed(1); }',
+                            ]
+                        ]
+                    ]
+                ];
+
+                // ======================================================
+                // GENERAR IMAGEN BASE64
+                // ======================================================
+                $url =
+                    'https://quickchart.io/chart?width=700&height=' .
+                    $alturaChart .
+                    '&backgroundColor=white&format=png&c=' .
+                    urlencode(json_encode($chartConfig));
+
+                try {
+                    $dataCurso['graficoBarras'] = 'data:image/png;base64,' . base64_encode(file_get_contents($url));
+                } catch (\Exception $e) {
+                    $dataCurso['graficoBarras'] = null;
+                }
+
+                return $dataCurso;
+            });
+        });
+
+        // ======================================================
+        // NOMBRE DEL ARCHIVO
+        // ======================================================
+        $docenteFile = strtoupper(str_replace(
+            [' ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ñ'],
+            ['_', 'A', 'E', 'I', 'O', 'U', 'N'],
+            $docente
+        ));
+
+        $fileName = 'REPORTE_' . $docenteFile . '_' . $codPro . '_' . $codEscuela . '.pdf';
+
+        // ======================================================
+        // GENERAR Y DESCARGAR PDF DIRECTO
+        // ======================================================
+        return Pdf::loadView('reportes.docentes.por_escuela_docente', [
+            'escuela'     => $escuela,
+            'cod_escuela' => $codEscuela,
+            'docente'     => $docente,
+            'facultad'    => $facultad,
+            'cursos'      => $cursos,
+        ])->download($fileName);
+    }
+
+    public function reporteGraficoPorEscuelaDocente_PRIMERAVERSION($codEscuela)
+    {
+        // ======================================================
+        // ESCUELA Y FACULTAD — SOLO PREGRADO
+        // ======================================================
+        $escuela = DB::table('matricula')
+            ->where('COD_ESCUELA', $codEscuela)
+            ->where('TIPO', 'PREGRADO')
+            ->value('NOM_ESCUELA');
+
+        if (!$escuela) {
+            abort(404, 'La escuela no existe en la base de datos.');
+        }
+
+        $facultad = DB::table('matricula')
+            ->where('COD_ESCUELA', $codEscuela)
+            ->where('TIPO', 'PREGRADO')
+            ->value('FACULTAD');
+
+        if (!$facultad) {
+            $facultad = 'FACULTAD NO REGISTRADA';
+        }
+
+        // ======================================================
+        // DATOS BASE — MISMA LÓGICA QUE REPORTE TABLA
+        // SOLO PREGRADO + SOLO ENCUESTA TIPO 1
+        // ======================================================
+        $datos = DB::table('enc_respuestas as r')
+            ->join('matricula as m', function ($join) {
+                $join->on('r.cod_alu', '=', 'm.COD_ALUMNO')
+                    ->on('r.cod_cur', '=', 'm.COD_CURSO')
+                    ->on('r.cod_pro', '=', 'm.COD_PRO')
+                    ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'))
+                    ->where('m.TIPO', 'PREGRADO');
+            })
+            ->join('enc_pregunta_general as p', 'r.cod_pre', '=', 'p.cod_pre')
+            ->join('enc_area_general as a', 'p.cod_area', '=', 'a.cod_area')
+
+            ->select(
+                'm.COD_PRO',
+                'm.PROFESOR as docente',
+                'm.DES_CURSO as curso',
+                'm.COD_TURNO as turno',
+
+                'a.cod_area',
+                'a.nom_area',
+
+                'p.nom_pre as pregunta',
+
+                DB::raw('SUM(r.cod_alt = 1) as n1'),
+                DB::raw('SUM(r.cod_alt = 2) as n2'),
+                DB::raw('SUM(r.cod_alt = 3) as n3'),
+                DB::raw('SUM(r.cod_alt = 4) as n4'),
+                DB::raw('SUM(r.cod_alt = 5) as n5'),
+
+                DB::raw('COUNT(r.cod_alt) as total_respuestas'),
+
+                // ======================================================
+                // MISMA FÓRMULA EXACTA DEL REPORTE TABLA
+                // ======================================================
+                DB::raw('ROUND(
+                (
+                    (
+                        SUM(r.cod_alt = 1) * 1 +
+                        SUM(r.cod_alt = 2) * 2 +
+                        SUM(r.cod_alt = 3) * 3 +
+                        SUM(r.cod_alt = 4) * 4
+                    )
+                    /
+                    NULLIF(
+                        SUM(r.cod_alt = 1) +
+                        SUM(r.cod_alt = 2) +
+                        SUM(r.cod_alt = 3) +
+                        SUM(r.cod_alt = 4),
+                    0)
+                ) * 5
+            , 2) as nota_pregunta')
+            )
+
+            // ======================================================
+            // FILTROS IMPORTANTES
+            // ======================================================
+            ->where('r.tipo', 1)
+            ->where('m.TIPO', 'PREGRADO')
+            ->where('m.COD_ESCUELA', $codEscuela)
+
+            ->groupBy(
+                'm.COD_PRO',
+                'm.PROFESOR',
+                'm.DES_CURSO',
+                'm.COD_TURNO',
+                'a.cod_area',
+                'a.nom_area',
+                'p.nom_pre'
+            )
+
+            ->orderBy('m.PROFESOR')
+            ->orderBy('m.DES_CURSO')
+            ->orderBy('m.COD_TURNO')
+            ->orderBy('a.cod_area')
+            ->orderBy('p.nom_pre')
+
+            ->get();
+
+        // ======================================================
+        // AGRUPAR POR DOCENTE
+        // ======================================================
+        $agrupado = $datos->groupBy('COD_PRO');
+
+        // ======================================================
+        // CREAR CARPETA
+        // ======================================================
+        $folder = 'reportes_graficos/docentes/' . $codEscuela;
+
+        Storage::makeDirectory($folder);
+
+        // ======================================================
+        // GENERAR PDF POR DOCENTE
+        // ======================================================
+        foreach ($agrupado as $codPro => $items) {
+
+            $docente = $items->first()->docente;
+            $curso   = $items->first()->curso;
+            $turno   = $items->first()->turno;
+
+            // ======================================================
+            // DATOS DEL GRÁFICO
+            // ======================================================
+            $labelsPreguntas    = [];
+            $promediosPreguntas = [];
+
+            foreach ($items as $item) {
+
+                $labelsPreguntas[] =
+                    mb_strimwidth($item->pregunta, 0, 75, '...');
+
+                $promediosPreguntas[] =
+                    (float) $item->nota_pregunta;
+            }
+
+            // ======================================================
+            // PROMEDIO GENERAL
+            // MISMA LÓGICA DEL REPORTE TABLA
+            // ======================================================
+            $totalPonderado  = 0;
+            $totalRespuestas = 0;
+
+            foreach ($items as $item) {
+
+                $totalPonderado +=
+                    ($item->n1 * 1) +
+                    ($item->n2 * 2) +
+                    ($item->n3 * 3) +
+                    ($item->n4 * 4);
+
+                $totalRespuestas +=
+                    $item->n1 +
+                    $item->n2 +
+                    $item->n3 +
+                    $item->n4;
+            }
+
+            $promedioGeneral = $totalRespuestas > 0
+                ? round(($totalPonderado / $totalRespuestas) * 5, 2)
+                : 0;
+
+            // ======================================================
+            // CONFIGURACIÓN GRÁFICO
+            // ======================================================
+            $cantPreguntas = count($labelsPreguntas);
+
+            $alturaChart = max(450, ($cantPreguntas * 32) + 120);
+
+            $chartConfigBar = [
+
+                'type' => 'horizontalBar',
+
+                'data' => [
+
+                    'labels' => $labelsPreguntas,
+
+                    'datasets' => [[
+                        'label' => 'Nota Promedio',
+
+                        'data' => $promediosPreguntas,
+
+                        'backgroundColor' => '#1d4ed8',
+
+                        'borderColor' => '#1e3a8a',
+
+                        'borderWidth' => 1,
+
+                        'barThickness' => 14,
+                    ]]
+                ],
+
+                'options' => [
+
+                    'responsive' => false,
+
+                    'legend' => [
+                        'display' => false
+                    ],
+
+                    'title' => [
+                        'display' => false
+                    ],
+
+                    'layout' => [
+                        'padding' => [
+                            'left' => 15,
+                            'right' => 50,
+                            'top' => 15,
+                            'bottom' => 15
+                        ]
+                    ],
+
+                    'scales' => [
+
+                        'xAxes' => [[
+
+                            'ticks' => [
+                                'beginAtZero' => true,
+                                'max' => 20,
+                                'fontSize' => 11
+                            ],
+
+                            'gridLines' => [
+                                'color' => '#dbeafe'
+                            ]
+                        ]],
+
+                        'yAxes' => [[
+
+                            'ticks' => [
+                                'fontSize' => 10
+                            ],
+
+                            'gridLines' => [
+                                'display' => false
+                            ]
+                        ]]
+                    ],
+
+                    // ======================================================
+                    // MOSTRAR NOTA EN CADA BARRA
+                    // ======================================================
+                    'plugins' => [
+
+                        'datalabels' => [
+
+                            'display' => true,
+
+                            'color' => '#111827',
+
+                            'anchor' => 'end',
+
+                            'align' => 'right',
+
+                            'offset' => 4,
+
+                            'font' => [
+                                'weight' => 'bold',
+                                'size' => 10
+                            ],
+
+                            'formatter' => 'function(value){ return value.toFixed(2); }'
+                        ]
+                    ]
+                ]
+            ];
+
+            // ======================================================
+            // GENERAR IMAGEN BASE64
+            // ======================================================
+            $urlBarras =
+                'https://quickchart.io/chart?width=1100&height=' .
+                $alturaChart .
+                '&backgroundColor=white&format=png&c=' .
+                urlencode(json_encode($chartConfigBar));
+
+            try {
+
+                $imgData = file_get_contents($urlBarras);
+
+                $graficoBarras =
+                    'data:image/png;base64,' .
+                    base64_encode($imgData);
+            } catch (\Exception $e) {
+
+                $graficoBarras = null;
+            }
+
+            // ======================================================
+            // NOMBRE ARCHIVO
+            // ======================================================
+            $docenteFile = strtoupper(str_replace(
+                [' ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ñ'],
+                ['_', 'A', 'E', 'I', 'O', 'U', 'N'],
+                $docente
+            ));
+
+            // ======================================================
+            // GENERAR PDF
+            // ======================================================
+            $pdf = Pdf::loadView('reportes.docentes.grafico_por_escuela', [
+
+                'escuela'         => $escuela,
+                'facultad'        => $facultad,
+
+                'docente'         => $docente,
+
+                'curso'           => $curso,
+
+                'turno'           => $turno,
+
+                'promedioGeneral' => $promedioGeneral,
+
+                'graficoBarras'   => $graficoBarras,
+            ]);
+
+            // ======================================================
+            // GUARDAR PDF
+            // ======================================================
+            $fileName =
+                $folder .
+                '/GRAFICO_' .
+                $docenteFile .
+                '_' .
+                $codPro .
+                '.pdf';
+
+            Storage::put($fileName, $pdf->output());
+        }
+
+        return "✅ PDFs gráficos generados en storage/app/public/$folder";
+    }
+
+    public function reporteGraficoPorEscuelaDocente($codEscuela)
+    {
+        // ======================================================
+        // ESCUELA Y FACULTAD — SOLO PREGRADO
+        // ======================================================
+        $escuela = DB::table('matricula')
+            ->where('COD_ESCUELA', $codEscuela)
+            ->where('TIPO', 'PREGRADO')
+            ->value('NOM_ESCUELA');
+
+        if (!$escuela) {
+            abort(404, 'La escuela no existe en la base de datos.');
+        }
+
+        $facultad = DB::table('matricula')
+            ->where('COD_ESCUELA', $codEscuela)
+            ->where('TIPO', 'PREGRADO')
+            ->value('FACULTAD') ?? 'FACULTAD NO REGISTRADA';
+
+        // ======================================================
+        // DATOS BASE — SOLO PREGRADO, SOLO TIPO 1
+        // ======================================================
+        $datos = DB::table('enc_respuestas as r')
+            ->join('matricula as m', function ($join) {
+                $join->on('r.cod_alu', '=', 'm.COD_ALUMNO')
+                    ->on('r.cod_cur', '=', 'm.COD_CURSO')
+                    ->on('r.cod_pro', '=', 'm.COD_PRO')
+                    ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'))
+                    ->where('m.TIPO', 'PREGRADO');
+            })
+            ->join('enc_pregunta_general as p', 'r.cod_pre', '=', 'p.cod_pre')
+            ->join('enc_area_general as a', 'p.cod_area', '=', 'a.cod_area')
+            ->select(
+                'm.COD_PRO',
+                'm.PROFESOR as docente',
+                'm.DES_CURSO as curso',
+                'm.COD_TURNO as turno',
+                'a.cod_area',
+                'a.nom_area',
+                'p.nom_pre as pregunta',
+                DB::raw('SUM(r.cod_alt = 1) as n1'),
+                DB::raw('SUM(r.cod_alt = 2) as n2'),
+                DB::raw('SUM(r.cod_alt = 3) as n3'),
+                DB::raw('SUM(r.cod_alt = 4) as n4'),
+                DB::raw('COUNT(r.cod_alt) as total_respuestas'),
+                DB::raw('ROUND(
+                (
+                    (
+                        SUM(r.cod_alt = 1) * 1 +
+                        SUM(r.cod_alt = 2) * 2 +
+                        SUM(r.cod_alt = 3) * 3 +
+                        SUM(r.cod_alt = 4) * 4
+                    )
+                    /
+                    NULLIF(
+                        SUM(r.cod_alt = 1) +
+                        SUM(r.cod_alt = 2) +
+                        SUM(r.cod_alt = 3) +
+                        SUM(r.cod_alt = 4),
+                    0)
+                ) * 5
+            , 2) as nota_pregunta')
+            )
+            ->where('r.tipo', 1)
+            ->where('m.TIPO', 'PREGRADO')
+            ->where('m.COD_ESCUELA', $codEscuela)
+            ->groupBy(
+                'm.COD_PRO',
+                'm.PROFESOR',
+                'm.DES_CURSO',
+                'm.COD_TURNO',
+                'a.cod_area',
+                'a.nom_area',
+                'p.nom_pre'
+            )
+            ->orderBy('a.cod_area')
+            ->orderBy('p.nom_pre')
+            ->get();
+
+        if ($datos->isEmpty()) {
+            abort(404, 'No se encontraron datos para esta escuela.');
+        }
+
+        // ======================================================
+        // DATOS DEL ÚNICO DOCENTE
+        // ======================================================
+        $docente = $datos->first()->docente;
+        $codPro  = $datos->first()->COD_PRO;
+        $curso   = $datos->first()->curso;
+        $turno   = $datos->first()->turno;
+
+        // ======================================================
+        // DATOS DEL GRÁFICO
+        // ======================================================
+        $labelsPreguntas    = [];
+        $promediosPreguntas = [];
+
+        foreach ($datos as $item) {
+            $labelsPreguntas[]    = mb_strimwidth($item->pregunta, 0, 75, '...');
+            $promediosPreguntas[] = (float) $item->nota_pregunta;
+        }
+
+        // ======================================================
+        // PROMEDIO GENERAL
+        // ======================================================
+        $totalPonderado  = 0;
+        $totalRespuestas = 0;
+
+        foreach ($datos as $item) {
+            $totalPonderado  += ($item->n1 * 1) + ($item->n2 * 2) + ($item->n3 * 3) + ($item->n4 * 4);
+            $totalRespuestas += $item->n1 + $item->n2 + $item->n3 + $item->n4;
+        }
+
+        $promedioGeneral = $totalRespuestas > 0
+            ? round(($totalPonderado / $totalRespuestas) * 5, 2)
+            : 0;
+
+        // ======================================================
+        // CONFIGURACIÓN GRÁFICO
+        // ======================================================
+        $alturaChart = max(450, (count($labelsPreguntas) * 32) + 120);
+
+        $chartConfigBar = [
+            'type' => 'horizontalBar',
+            'data' => [
+                'labels'   => $labelsPreguntas,
+                'datasets' => [[
+                    'label'           => 'Nota Promedio',
+                    'data'            => $promediosPreguntas,
+                    'backgroundColor' => '#1d4ed8',
+                    'borderColor'     => '#1e3a8a',
+                    'borderWidth'     => 1,
+                    'barThickness'    => 14,
+                ]]
+            ],
+            'options' => [
+                'responsive' => false,
+                'legend'     => ['display' => false],
+                'title'      => ['display' => false],
+                'layout'     => ['padding' => ['left' => 15, 'right' => 50, 'top' => 15, 'bottom' => 15]],
+                'scales' => [
+                    'xAxes' => [[
+                        'ticks'     => ['beginAtZero' => true, 'max' => 20, 'fontSize' => 11],
+                        'gridLines' => ['color' => '#dbeafe'],
+                    ]],
+                    'yAxes' => [[
+                        'ticks'     => ['fontSize' => 10],
+                        'gridLines' => ['display' => false],
+                    ]]
+                ],
+                'plugins' => [
+                    'datalabels' => [
+                        'display'   => true,
+                        'color'     => '#111827',
+                        'anchor'    => 'end',
+                        'align'     => 'right',
+                        'offset'    => 4,
+                        'font'      => ['weight' => 'bold', 'size' => 10],
+                        'formatter' => 'function(value){ return value.toFixed(2); }',
+                    ]
+                ]
+            ]
+        ];
+
+        // ======================================================
+        // GENERAR IMAGEN BASE64
+        // ======================================================
+        $urlBarras =
+            'https://quickchart.io/chart?width=1100&height=' .
+            $alturaChart .
+            '&backgroundColor=white&format=png&c=' .
+            urlencode(json_encode($chartConfigBar));
+
+        try {
+            $graficoBarras = 'data:image/png;base64,' . base64_encode(file_get_contents($urlBarras));
+        } catch (\Exception $e) {
+            $graficoBarras = null;
+        }
+
+        // ======================================================
+        // NOMBRE DEL ARCHIVO
+        // ======================================================
+        $docenteFile = strtoupper(str_replace(
+            [' ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ñ'],
+            ['_', 'A', 'E', 'I', 'O', 'U', 'N'],
+            $docente
+        ));
+
+        $fileName = 'GRAFICO_' . $docenteFile . '_' . $codPro . '.pdf';
+
+        // ======================================================
+        // GENERAR Y DESCARGAR PDF DIRECTO
+        // ======================================================
+        return Pdf::loadView('reportes.docentes.grafico_por_escuela', [
+            'escuela'         => $escuela,
+            'facultad'        => $facultad,
+            'docente'         => $docente,
+            'curso'           => $curso,
+            'turno'           => $turno,
+            'promedioGeneral' => $promedioGeneral,
+            'graficoBarras'   => $graficoBarras,
+        ])->download($fileName);
+    }
+
+    public function reporteGraficoGeneralDocente()
+    {
+        // ======================================================
+        // DATOS POR PREGUNTA — SOLO ESPECIALIDAD
+        // ======================================================
+        $datos = DB::table('enc_respuestas as r')
+            ->join('matricula as m', function ($join) {
+                $join->on('r.cod_alu', '=', 'm.COD_ALUMNO')
+                    ->on('r.cod_cur', '=', 'm.COD_CURSO')
+                    ->on('r.cod_pro', '=', 'm.COD_PRO')
+                    ->on(DB::raw('TRIM(r.turno)'), '=', DB::raw('TRIM(m.COD_TURNO)'));
+            })
+            ->join('enc_pregunta_general as p', 'r.cod_pre', '=', 'p.cod_pre')
+            ->join('enc_area_general as a', 'p.cod_area', '=', 'a.cod_area')
+            ->where('m.TIPO', 'ESPECIALIDAD')
+            ->select(
+                'a.cod_area',
+                'a.nom_area',
+                'p.cod_pre',
+                'p.nom_pre as pregunta',
+
+                DB::raw('SUM(r.cod_alt = 1) as n1'),
+                DB::raw('SUM(r.cod_alt = 2) as n2'),
+                DB::raw('SUM(r.cod_alt = 3) as n3'),
+                DB::raw('SUM(r.cod_alt = 4) as n4'),
+
+                DB::raw('ROUND(
+                (
+                    (
+                        SUM(r.cod_alt = 1) * 1 +
+                        SUM(r.cod_alt = 2) * 2 +
+                        SUM(r.cod_alt = 3) * 3 +
+                        SUM(r.cod_alt = 4) * 4
+                    )
+                    /
+                    NULLIF(
+                        SUM(r.cod_alt = 1) +
+                        SUM(r.cod_alt = 2) +
+                        SUM(r.cod_alt = 3) +
+                        SUM(r.cod_alt = 4),
+                    0)
+                ) * 5
+            , 2) as nota_pregunta')
+            )
+            ->groupBy(
+                'a.cod_area',
+                'a.nom_area',
+                'p.cod_pre',
+                'p.nom_pre'
+            )
+            ->orderBy('a.cod_area')
+            ->orderBy('p.cod_pre')
+            ->get();
+
+        if ($datos->isEmpty()) {
+            abort(404, 'No hay respuestas de tipo ESPECIALIDAD registradas.');
+        }
+
+        // ======================================================
+        // TOTAL ENCUESTADOS ÚNICOS
+        // ======================================================
+        $totalEncuestados = DB::table('matricula')
+            ->where('TIPO', 'ESPECIALIDAD')
+            ->where('ENCUESTADO', 1)
+            ->count();
+
+        // ======================================================
+        // TOTALES GLOBALES
+        // ======================================================
+        $totalN1 = $datos->sum('n1');
+        $totalN2 = $datos->sum('n2');
+        $totalN3 = $datos->sum('n3');
+        $totalN4 = $datos->sum('n4');
+
+        $totalPonderado =
+            ($totalN1 * 1) +
+            ($totalN2 * 2) +
+            ($totalN3 * 3) +
+            ($totalN4 * 4);
+
+        $totalRespuestas = $totalN1 + $totalN2 + $totalN3 + $totalN4;
+
+        $promedioGeneral = $totalRespuestas > 0
+            ? round(($totalPonderado / $totalRespuestas) * 5, 2)
+            : 0;
+
+        // ======================================================
+        // AGRUPAR POR ÁREA PARA LA TABLA
+        // ======================================================
+        $areas = [];
+
+        foreach ($datos->groupBy('nom_area') as $nomArea => $preguntas) {
+
+            $ponderadoArea  = 0;
+            $respuestasArea = 0;
+
+            foreach ($preguntas as $p) {
+                $ponderadoArea  += ($p->n1 * 1) + ($p->n2 * 2) + ($p->n3 * 3) + ($p->n4 * 4);
+                $respuestasArea += $p->n1 + $p->n2 + $p->n3 + $p->n4;
+            }
+
+            $areas[$nomArea] = [
+                'preguntas'      => $preguntas,
+                'promedioArea'   => $respuestasArea > 0
+                    ? round(($ponderadoArea / $respuestasArea) * 5, 2)
+                    : 0,
+            ];
+        }
+
+        // ======================================================
+        // DATOS PARA EL GRÁFICO DE BARRAS
+        // ======================================================
+        $labelsPreguntas    = [];
+        $promediosPreguntas = [];
+        $coloresBarras      = [];
+
+        $paleta = [
+            '#1e3a8a',
+            '#0f766e',
+            '#7c3aed',
+            '#b45309',
+            '#0369a1',
+            '#15803d',
+            '#c2410c',
+            '#6d28d9',
+        ];
+
+        $areaIndex  = 0;
+        $areaActual = null;
+
+        foreach ($datos as $item) {
+
+            if ($item->nom_area !== $areaActual) {
+                $areaActual = $item->nom_area;
+                $areaIndex++;
+            }
+
+            $color = $paleta[($areaIndex - 1) % count($paleta)];
+
+            $labelsPreguntas[]    = mb_strimwidth($item->pregunta, 0, 60, '...');
+            $promediosPreguntas[] = (float) $item->nota_pregunta;
+            $coloresBarras[]      = $color;
+        }
+
+        // ======================================================
+        // CONFIGURACIÓN GRÁFICO DE BARRAS HORIZONTAL
+        // ======================================================
+        $cantPreguntas = count($labelsPreguntas);
+        $alturaChart   = max(300, $cantPreguntas * 28 + 60);
+
+        $chartConfigBar = [
+            'type' => 'horizontalBar',
+
+            'data' => [
+                'labels'   => $labelsPreguntas,
+                'datasets' => [[
+                    'label'           => 'Nota Promedio',
+                    'data'            => $promediosPreguntas,
+                    'backgroundColor' => $coloresBarras,
+                    'borderColor'     => '#0f172a',
+                    'borderWidth'     => 1,
+                    'barThickness'    => 12,
+                ]]
+            ],
+
+            'options' => [
+                'responsive' => false,
+                'legend'     => ['display' => false],
+                'title'      => ['display' => false],
+
+                'layout' => [
+                    'padding' => [
+                        'right'  => 40,
+                        'left'   => 10,
+                        'top'    => 10,
+                        'bottom' => 10,
+                    ]
+                ],
+
+                'scales' => [
+                    'xAxes' => [[
+                        'ticks' => [
+                            'beginAtZero' => true,
+                            'max'         => 20,
+                            'fontSize'    => 11,
+                        ],
+                        'gridLines' => ['color' => '#e2e8f0'],
+                    ]],
+                    'yAxes' => [[
+                        'ticks' => ['fontSize' => 9],
+                    ]],
+                ],
+
+                'plugins' => [
+                    'datalabels' => [
+                        'color'  => '#0f172a',
+                        'anchor' => 'end',
+                        'align'  => 'right',
+                        'font'   => ['weight' => 'bold', 'size' => 9],
+                    ]
+                ]
+            ]
+        ];
+
+        // ======================================================
+        // CONVERTIR A BASE64 PARA DOMPDF
+        // ======================================================
+        $urlBarras =
+            'https://quickchart.io/chart?width=800&height=' . $alturaChart .
+            '&backgroundColor=white&format=png&c=' .
+            urlencode(json_encode($chartConfigBar));
+
+        try {
+            $imgData       = file_get_contents($urlBarras);
+            $graficoBarras = 'data:image/png;base64,' . base64_encode($imgData);
+        } catch (\Exception $e) {
+            $graficoBarras = null;
+        }
+
+        // ======================================================
+        // GENERAR Y DESCARGAR PDF
+        // ======================================================
+        $pdf = Pdf::loadView('reportes.docentes.grafico_general', [
+            'promedioGeneral'  => $promedioGeneral,
+            'totalRespuestas'  => $totalRespuestas,
+            'totalEncuestados' => $totalEncuestados,
+            'areas'            => $areas,
+            'graficoBarras'    => $graficoBarras,
+        ]);
+
+        return $pdf->download('REPORTE_GENERAL_DOCENTES.pdf');
+    }
 
 
 
